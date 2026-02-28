@@ -1,0 +1,808 @@
+### Health Check
+- **Endpoint:** `GET /health`
+- **Expected Response:**
+  ```json
+  {
+    "success": true,
+    "message": "Server is running",
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "environment": "development"
+  }
+  ```
+
+---
+
+## Authentication & User Management
+
+### 1. User Registration
+- **Endpoint:** `POST /api/register`
+- **Headers:** `Content-Type: application/json`
+- **Request Body:**
+  ```json
+  {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "password": "Password123!",
+    "phone": "+1234567890"
+  }
+  ```
+- **Expected Response (201):**
+  ```json
+  {
+    "success": true,
+    "message": "Registration successful. Activation email sent to john@example.com",
+    "data": {
+      "email": "john@example.com",
+      "activationRequired": true
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid registration data
+- ❌ Duplicate email/phone (409 Conflict)
+- ❌ Invalid email format (400 Bad Request)
+- ❌ Weak password (400 Bad Request)
+- ❌ Missing required fields (400 Bad Request)
+
+### 2. Account Activation
+- **Endpoint:** `POST /api/activation`
+- **Request Body:**
+  ```json
+  will give email and token on email http://10.13.47.130:5000/api/auth/activation/{token} when hitted return below
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Account activated successfully",
+    "data": {
+      "accessToken": "jwt_access_token",
+      "refreshToken": "jwt_refresh_token",
+      "user": {
+        "_id": "user_id",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "role": "user"
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid activation token
+- ❌ Invalid token (400 Bad Request)
+- ❌ Expired token (400 Bad Request)
+- ❌ Already activated account (400 Bad Request)
+
+### 3. User Login
+- **Endpoint:** `POST /api/login`
+- **Request Body:**
+  ```json
+  {
+    "email": "john@example.com",
+    "password": "Password123!",
+    "deviceInfo": "Chrome Browser"
+  }
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Sign in successful",
+    "data": {
+      "accessToken": "jwt_access_token",
+      "refreshToken": "jwt_refresh_token",
+      "user": {
+        "_id": "user_id",
+        "name": "John Doe",
+        "email": "john@example.com",
+        "role": "user",
+        "phone": "+1234567890",
+        "lastLogin": "2024-01-01T00:00:00.000Z"
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid credentials
+- ❌ Invalid email (401 Unauthorized)
+- ❌ Invalid password (401 Unauthorized)
+- ❌ Inactive account (401 Unauthorized)
+
+### 4. Token Refresh
+- **Endpoint:** `POST /api/refresh-token`
+- **Request Body:**
+  ```json
+  {
+    "refreshToken": "valid_refresh_token"
+  }
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Token refreshed successfully",
+    "data": {
+      "accessToken": "new_jwt_access_token",
+      "refreshToken": "new_jwt_refresh_token"
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid refresh token
+- ❌ Invalid refresh token (401 Unauthorized)
+- ❌ Expired refresh token (401 Unauthorized)
+
+### 5. Password Reset Flow
+- **Forgot Password:** `POST /api/forgot-password`
+- **Reset Password:** `POST /api/reset-password`
+
+---
+
+## Item Management API
+
+### 1. Add/Update Item
+- **Endpoint:** `POST /api/senditemdata`
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Request Body:**
+  ```json
+  {
+    "productName": "iPhone 15",
+    "quantity": 10,
+    "weight": 0.2,
+    "price": 999.99,
+    "dimensions": {
+      "length": 15.5,
+      "breadth": 7.5,
+      "height": 0.8
+    },
+    "category": "Electronics",
+    "brand": "Apple"
+  }
+  ```
+- **Expected Response (201 for new, 200 for update):**
+  ```json
+  {
+    "success": true,
+    "message": "Item added successfully!",
+    "data": {
+      "_id": "item_id",
+      "productName": "iPhone 15",
+      "quantity": 10,
+      "weight": 0.2,
+      "price": 999.99,
+      "dimensions": {
+        "length": 15.5,
+        "breadth": 7.5,
+        "height": 0.8
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Add new item
+- ✅ Update existing item (quantity increment)
+- ❌ Missing productName (400 Bad Request)
+- ❌ Invalid authentication (401 Unauthorized)
+- ❌ Negative values (400 Bad Request)
+
+### 2. Get All Items
+- **Endpoint:** `GET /api/getitemdata?page=1&limit=10&search=iPhone&sortBy=productName&sortOrder=asc`
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Items retrieved successfully",
+    "data": {
+      "items": [...],
+      "pagination": {
+        "currentPage": 1,
+        "totalPages": 5,
+        "totalItems": 50,
+        "itemsPerPage": 10,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid pagination, filtering, sorting
+- ❌ Invalid page/limit (400 Bad Request)
+- ❌ Unauthorized access (401 Unauthorized)
+
+### 3. Get Item by ID
+- **Endpoint:** `GET /api/getitem/:id`
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Item details retrieved successfully",
+    "data": {
+      "_id": "item_id",
+      "productName": "iPhone 15",
+      "quantity": 10,
+      "weight": 0.2,
+      "price": 999.99,
+      "dimensions": {
+        "length": 15.5,
+        "breadth": 7.5,
+        "height": 0.8
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid item ID
+- ❌ Invalid item ID (400 Bad Request)
+- ❌ Item not found (404 Not Found)
+- ❌ Unauthorized access (401 Unauthorized)
+
+### 4. Delete Item
+- **Endpoint:** `DELETE /api/deleteitem/:id`
+- **Headers:** `Authorization: Bearer <access_token>`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Item deleted successfully"
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid item ID
+- ❌ Invalid item ID (400 Bad Request)
+- ❌ Item not found (404 Not Found)
+- ❌ Unauthorized access (401 Unauthorized)
+
+---
+
+## Box Management API
+
+### 1. Add Box
+- **Endpoint:** `POST /api/addbox`
+- **Request Body:**
+  ```json
+  {
+    "boxName": "Medium Box",
+    "length": 12,
+    "breadth": 8,
+    "height": 6,
+    "quantity": 50,
+    "max_weight": 5
+  }
+  ```
+- **Expected Response (201):**
+  ```json
+  {
+    "success": true,
+    "message": "Box added successfully!",
+    "data": {
+      "_id": "box_id",
+      "boxName": "Medium Box",
+      "length": 12,
+      "breadth": 8,
+      "height": 6,
+      "quantity": 50,
+      "max_weight": 5
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Add new box
+- ❌ Missing boxName (400 Bad Request)
+- ❌ Negative dimensions/weight (400 Bad Request)
+- ❌ Invalid quantity (400 Bad Request)
+
+### 2. Update Box Quantity
+- **Endpoint:** `POST /api/updateboxquantity`
+- **Request Body:**
+  ```json
+  {
+    "boxName": "Medium Box",
+    "additionalQuantity": 20
+  }
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Box quantity updated successfully",
+    "data": {
+      "_id": "box_id",
+      "boxName": "Medium Box",
+      "quantity": 70
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid box name and quantity
+- ❌ Box not found (404 Not Found)
+- ❌ Invalid quantity (400 Bad Request)
+
+### 3. Get All Boxes
+- **Endpoint:** `GET /api/getboxes?page=1&limit=20&search=medium&minWeight=1&maxWeight=10`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Boxes retrieved successfully",
+    "data": {
+      "boxes": [...],
+      "pagination": {
+        "currentPage": 1,
+        "totalPages": 3,
+        "totalItems": 45,
+        "itemsPerPage": 20,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid pagination, filtering, search
+- ❌ Invalid page/limit (400 Bad Request)
+
+### 4. Delete Box
+- **Endpoint:** `DELETE /api/deletebox/:id`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Box deleted successfully"
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid box ID
+- ❌ Invalid box ID (400 Bad Request)
+- ❌ Box not found (404 Not Found)
+
+---
+
+## Packing & Shipping APIs
+
+### 1. Optimal Packing Calculation
+- **Endpoint:** `POST /api/optimal-packing2`
+- **Request Body:**
+  ```json
+  {
+    "product": {
+      "length": 10,
+      "breadth": 5,
+      "height": 3,
+      "weight": 1.5,
+      "quantity": 20
+    },
+    "cartons": [
+      {
+        "length": 15,
+        "breadth": 10,
+        "height": 8,
+        "maxWeight": 10
+      },
+      {
+        "length": 20,
+        "breadth": 15,
+        "height": 12,
+        "maxWeight": 15
+      }
+    ]
+  }
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Optimal packing calculation completed successfully",
+    "packingResults": [...],
+    "remainingQuantity": 0,
+    "summary": {
+      "totalItemsPacked": 20,
+      "totalCartonsUsed": 2,
+      "averageEfficiency": 0.85,
+      "packingSuccess": true
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid product and carton data
+- ✅ Partial packing scenarios (206 response)
+- ❌ Zero/negative dimensions (400 Bad Request)
+- ❌ Missing required fields (400 Bad Request)
+- ❌ Empty cartons array (400 Bad Request)
+
+### 2. Shipping Calculation
+- **Endpoint:** `POST /api/calculate-shipping`
+- **Request Body:**
+  ```json
+  {
+    "shape": "cuboid",
+    "dimensions": {
+      "length": 10,
+      "breadth": 8,
+      "height": 6
+    },
+    "unit": "cm",
+    "weight": 2.5,
+    "weightUnit": "kg",
+    "quantity": 15,
+    "preferences": {
+      "optimizeFor": "cost"
+    }
+  }
+  ```
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Packing calculation completed successfully",
+    "data": {
+      "input": {
+        "product": {
+          "shape": "cuboid",
+          "calculatedDimensions": {
+            "length": 10,
+            "breadth": 8,
+            "height": 6,
+            "volume": 480
+          },
+          "weight": {
+            "converted": 2.5,
+            "convertedUnit": "kg"
+          }
+        }
+      },
+      "results": {...}
+    }
+  }
+  ```
+
+#### Shape-specific Test Cases:
+- **Cube:** dimensions.side required
+- **Cuboid/Rectangular:** length, breadth, height required
+- **Cylinder:** radius, height required
+- **Sphere:** radius required
+
+### 3. Get Carton Sizes
+- **Endpoint:** `GET /api/carton-sizes`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Available carton sizes retrieved successfully",
+    "data": {
+      "cartons": [...],
+      "units": {
+        "dimension": "inches",
+        "weight": "kg",
+        "cost": "USD"
+      }
+    }
+  }
+  ```
+
+---
+
+## Packing Data Management
+
+### 1. Send Packing Data
+- **Endpoint:** `POST /api/sendPackagingData`
+- **Request Body:**
+  ```json
+  {
+    "productName": "Sample Product",
+    "shape": "cuboid",
+    "weight": 2.5,
+    "quantity": 10,
+    "price": 99.99
+  }
+  ```
+- **Expected Response (201):**
+  ```json
+  {
+    "success": true,
+    "message": "Packing data submitted successfully",
+    "data": {
+      "_id": "packing_data_id",
+      "productName": "Sample Product",
+      "shape": "cuboid",
+      "weight": 2.5,
+      "quantity": 10,
+      "price": 99.99
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid packing data
+- ❌ Missing productName (400 Bad Request)
+- ❌ Negative weight/quantity (400 Bad Request)
+
+### 2. Get Packing Data
+- **Endpoint:** `GET /api/getPackagingData?page=1&limit=10&productName=sample&sortBy=createdAt`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Packing data retrieved successfully",
+    "data": {
+      "packingData": [...],
+      "pagination": {
+        "currentPage": 1,
+        "totalPages": 3,
+        "totalItems": 25,
+        "itemsPerPage": 10,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
+    }
+  }
+  ```
+
+### 3. Get Packing Statistics
+- **Endpoint:** `GET /api/packaging-statistics`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Packing statistics retrieved successfully",
+    "data": {
+      "totalItemsPacked": 1000,
+      "totalCartonsUsed": 250,
+      "averagePackingTime": "15s",
+      "mostPopularCartonSize": "Medium Box"
+    }
+  }
+  ```
+
+### 4. Delete Packing Data
+- **Endpoint:** `DELETE /api/deletePackaging/:id`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Packing data deleted successfully"
+  }
+  ```
+
+---
+
+## AI Integration (Gemini)
+
+### 1. Predict Dimensions from Image
+- **Endpoint:** `POST /api/ai/predict-dimensions`
+- **Headers:** 
+  - `Authorization: Bearer <access_token>`
+  - `Content-Type: multipart/form-data` (automatically set by client)
+- **Form Data:**
+  - `image`: image file (JPEG, PNG, WebP, max 10MB)
+  - `referenceObject`: "coin" (optional)
+  - `unit`: "cm" (optional, default: cm)
+  - `additionalContext`: "package on table" (optional)
+
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Dimension prediction completed successfully",
+    "data": {
+      "prediction": {
+        "object_name": "smartphone",
+        "shape": "cuboid",
+        "dimensions": {
+          "length": 15.5,
+          "width": 7.5,
+          "height": 0.8,
+          "unit": "cm"
+        },
+        "estimated_weight": {
+          "value": 0.2,
+          "unit": "kg",
+          "confidence": "medium"
+        },
+        "material": "plastic/metal",
+        "confidence_level": "high",
+        "notes": "Modern smartphone with rectangular design"
+      }
+    }
+  }
+  ```
+
+#### Test Cases:
+- ✅ Valid image upload with reference object
+- ✅ Different image formats (JPEG, PNG, WebP)
+- ❌ No image uploaded (400 Bad Request)
+- ❌ Invalid file format (400 Bad Request)
+- ❌ File size exceeds 10MB (400 Bad Request)
+- ❌ Invalid unit parameter (400 Bad Request)
+- ❌ Network connection issues (Network request failed)
+- ❌ Server timeout (408 Request Timeout)
+
+### 2. Get Prediction History
+- **Endpoint:** `GET /api/ai/prediction-history?page=1&limit=10`
+- **Expected Response (200):**
+  ```json
+  {
+    "success": true,
+    "message": "Prediction history retrieved successfully",
+    "data": {
+      "predictions": [...],
+      "pagination": {
+        "currentPage": 1,
+        "totalPages": 5,
+        "totalItems": 50,
+        "itemsPerPage": 10,
+        "hasNextPage": true,
+        "hasPrevPage": false
+      }
+    }
+  }
+  ```
+
+---
+
+## Security & Error Handling
+
+### Authentication Testing
+1. **Missing Token:**
+   ```bash
+   curl -X GET http://10.13.47.130:5000/api/getitemdata
+   # Expected: 401 Unauthorized
+   ```
+
+2. **Invalid Token:**
+   ```bash
+   curl -X GET http://10.13.47.130:5000/api/getitemdata \
+   -H "Authorization: Bearer invalid_token"
+   # Expected: 401 Unauthorized
+   ```
+
+3. **Expired Token:**
+   - Test with expired JWT
+   - Expected: 401 Unauthorized
+
+### Rate Limiting Tests
+1. **Auth Endpoints:** Max 5 requests per 15 minutes
+2. **Password Reset:** Max 3 requests per hour
+3. **General API:** Max 100 requests per 15 minutes
+
+### Input Validation Tests
+1. **XSS Prevention:**
+   ```json
+   {
+     "productName": "<script>alert('xss')</script>",
+     "quantity": 10
+   }
+   ```
+   - Expected: Sanitized input
+
+2. **SQL Injection (NoSQL):**
+   ```json
+   {
+     "email": {"$ne": ""},
+     "password": "anything"
+   }
+   ```
+   - Expected: 400 Bad Request
+
+### Error Response Format
+All errors should follow this format:
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "errors": [...] // Optional validation errors
+}
+```
+
+---
+
+## Performance Testing
+
+### Load Testing Scenarios
+1. **Concurrent Users:**
+   - 50 simultaneous API requests
+   - Monitor response times and error rates
+
+2. **Large Payloads:**
+   - Upload 10MB images to AI endpoint
+   - Send packing requests with 1000+ items
+
+3. **Database Stress:**
+   - Pagination with large datasets (10k+ items)
+   - Complex filtering and sorting queries
+
+### Memory and CPU Monitoring
+- Monitor server resources during peak loads
+- Check for memory leaks during extended testing
+
+---
+
+## Test Automation Guidelines
+
+### Setup Jest Testing Framework
+```bash
+npm install --save-dev jest supertest
+```
+
+### Sample Test Structure
+```javascript
+// tests/auth.test.js
+const request = require('supertest');
+const app = require('../server');
+
+describe('Authentication', () => {
+  test('should register new user', async () => {
+    const response = await request(app)
+      .post('/api/register')
+      .send({
+        name: 'Test User',
+        email: 'test@example.com',
+        password: 'Password123!',
+        phone: '+1234567890'
+      });
+    
+    expect(response.status).toBe(201);
+    expect(response.body.success).toBe(true);
+  });
+});
+```
+
+### Test Categories
+1. **Unit Tests:** Individual functions and utilities
+2. **Integration Tests:** API endpoints with database
+3. **E2E Tests:** Complete user workflows
+
+### Coverage Goals
+- **Minimum:** 80% code coverage
+- **Critical Paths:** 95% coverage (auth, packing logic)
+
+---
+
+## Test Data Management
+
+### Test Database Setup
+- Use separate test database: `shipwise_test`
+- Reset database before each test suite
+- Seed with consistent test data
+
+### Sample Test Data
+```javascript
+// testData/users.js
+const testUsers = [
+  {
+    name: 'Test User 1',
+    email: 'test1@example.com',
+    password: 'Password123!',
+    phone: '+1234567890'
+  }
+];
+
+// testData/items.js
+const testItems = [
+  {
+    productName: 'Test Item 1',
+    quantity: 10,
+    weight: 1.5,
+    dimensions: {
+      length: 10,
+      breadth: 8,
+      height: 6
+    }
+  }
+];
+```
