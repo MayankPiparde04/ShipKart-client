@@ -103,7 +103,7 @@ export default function Inventory() {
           weight: prediction.weight?.value
             ? String(prediction.weight.value)
             : "",
-          price: "",
+          price: prediction.price ? String(prediction.price) : "",
           length: prediction.dimensions?.length
             ? String(prediction.dimensions.length)
             : "",
@@ -114,7 +114,7 @@ export default function Inventory() {
             ? String(prediction.dimensions.height)
             : "",
           category: prediction.category || "",
-          brand: "",
+          brand: prediction.brand !== "Unknown" ? (prediction.brand || "") : "",
         });
       } catch {
         // ignore

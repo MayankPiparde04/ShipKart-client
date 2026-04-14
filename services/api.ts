@@ -4,7 +4,13 @@ import { Platform } from 'react-native';
 // Determine base URL dynamically or from environment
 // Since you are using an Android Studio AVD (Pixel_8_Pro), 10.0.2.2 is the required loopback alias.
 const fallbackUrl = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || fallbackUrl;
+
+// CRITICAL SECURITY FIX: Never use local fallbacks if the app is bundled for production execution.
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? fallbackUrl : '');
+
+if (!BASE_URL && !__DEV__) {
+  console.error("CRITICAL ERROR: EXPO_PUBLIC_API_URL is entirely missing in a production application build.");
+}
 
 interface FetchOptions extends RequestInit {
   timeout?: number;
@@ -34,7 +40,8 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     } as HeadersInit & Record<string, string>,
-    signal: controller.signal,
+    // Use the provided signal if present, otherwise default to the internal timeout controller
+    signal: rest.signal || controller.signal,
   };
 
   // IMPORTANT: Let React Native set the Content-Type with boundary for FormData
@@ -91,10 +98,17 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
         data.success = true;
     }
     
-    // Normalize error response
+    // Normalize error response for nested express-validator arrays
     if (!response.ok) {
+        let extractedMessage = data.message || `HTTP Error ${response.status}`;
+        
+        // If the server responded with an express-validator errors array
+        if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+            extractedMessage = data.errors.map((e: any) => e.msg || e.message).filter(Boolean).join('\n') || extractedMessage;
+        }
+
         throw {
-            message: data.message || `HTTP Error ${response.status}`,
+            message: extractedMessage,
             status: response.status,
             data
         };
@@ -216,7 +230,8 @@ export const apiService = {
     imageUri: string,
     referenceObject: string,
     unit: string,
-    additionalContext: string
+    additionalContext: string,
+    signal?: AbortSignal
   ) => {
     try {
       const formData = new FormData();
@@ -239,10 +254,14 @@ export const apiService = {
         method: 'POST',
         body: formData,
         timeout: 120000, 
+        signal: signal,
       });
       
       return response.data;
     } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Prediction cancelled by user');
+      }
       console.error('Prediction error:', error.message);
       throw { 
         message: error.message,

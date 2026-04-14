@@ -42,9 +42,9 @@ export default function AnalyticsDashboard() {
   };
 
   const chartConfig = {
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+    backgroundGradientFrom: "#dadada",
+    backgroundGradientTo: "#dadada",
+    color: (opacity = 1) => `rgba(7, 15, 255, ${opacity})`,
     strokeWidth: 2,
     barPercentage: 0.5,
     useShadowColorFromDataset: false,
@@ -53,7 +53,7 @@ export default function AnalyticsDashboard() {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-gray-950">
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color="#070fff" />
       </View>
     );
   }
@@ -65,7 +65,7 @@ export default function AnalyticsDashboard() {
       {/* Header */}
       <View className="px-4 py-4 border-b border-gray-200 dark:border-gray-800 flex-row items-center">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
-          <Ionicons name="arrow-back" size={24} color="#6b7280" />
+          <Ionicons name="arrow-back" size={24} color="#111111" />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
           Analytics Dashboard
@@ -129,19 +129,19 @@ export default function AnalyticsDashboard() {
             yAxisSuffix=""
             yAxisInterval={1}
             chartConfig={{
-              backgroundColor: "#ffffff",
-              backgroundGradientFrom: "#ffffff",
-              backgroundGradientTo: "#ffffff",
+              backgroundColor: "#dadada",
+              backgroundGradientFrom: "#dadada",
+              backgroundGradientTo: "#dadada",
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+              color: (opacity = 1) => `rgba(7, 15, 255, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(17, 17, 17, ${opacity})`,
               style: {
                 borderRadius: 16,
               },
               propsForDots: {
                 r: "6",
                 strokeWidth: "2",
-                stroke: "#2563EB",
+                stroke: "#007fff",
               },
             }}
             bezier
@@ -162,15 +162,15 @@ export default function AnalyticsDashboard() {
               {
                 name: "Items",
                 population: overview?.itemsInStock || 0,
-                color: "#3B82F6",
-                legendFontColor: "#7F7F7F",
+                color: "#007fff",
+                legendFontColor: "#111111",
                 legendFontSize: 15,
               },
               {
                 name: "Boxes",
                 population: overview?.boxesInStock || 0,
-                color: "#F59E0B",
-                legendFontColor: "#7F7F7F",
+                color: "#ff7700",
+                legendFontColor: "#111111",
                 legendFontSize: 15,
               },
             ]}

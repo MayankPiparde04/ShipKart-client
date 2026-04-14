@@ -178,7 +178,7 @@ export default function PackingAnalysisResult({
                   Volume Efficiency
                 </Text>
                 <Text className="text-gray-900 dark:text-gray-100 font-medium">
-                  {result.summary?.overallVolumeEfficiency || 0}%
+                  {result.summary?.overallVolumeEfficiency * 100 || 0}%
                 </Text>
               </View>
               <View
@@ -193,7 +193,7 @@ export default function PackingAnalysisResult({
                     backgroundColor: "#8b5cf6",
                     height: 8,
                     borderRadius: 4,
-                    width: `${Math.min(result.summary?.overallVolumeEfficiency || 0, 100)}%`,
+                    width: `${Math.min(result.summary?.overallVolumeEfficiency * 100 || 0, 100)}%`,
                   }}
                 />
               </View>
@@ -204,7 +204,8 @@ export default function PackingAnalysisResult({
                   Packing Quality Score
                 </Text>
                 <Text className="text-gray-900 dark:text-gray-100 font-medium">
-                  {result.analytics?.packingQuality?.overallScore || 0}/100
+                  {result.analytics?.packingQuality?.overallScore * 100 || 0}
+                  /100
                 </Text>
               </View>
               <View
@@ -219,7 +220,7 @@ export default function PackingAnalysisResult({
                     backgroundColor: "#16a34a",
                     height: 8,
                     borderRadius: 4,
-                    width: `${Math.min(result.analytics?.packingQuality?.overallScore || 0, 100)}%`,
+                    width: `${Math.min(result.analytics?.packingQuality?.overallScore * 100 || 0, 100)}%`,
                   }}
                 />
               </View>
@@ -267,7 +268,7 @@ export default function PackingAnalysisResult({
                     Efficiency
                   </Text>
                   <Text className="text-gray-900 dark:text-gray-100 font-medium">
-                    {carton.avgEfficiency}%
+                    {carton.avgEfficiency * 100}%
                   </Text>
                 </View>
               </View>

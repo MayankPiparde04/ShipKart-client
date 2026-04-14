@@ -14,7 +14,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Shipwise_logo_t.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#dadada"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -36,7 +36,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#0f172a"
+          "backgroundColor": "#111111"
         }
       ],
       [

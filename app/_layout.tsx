@@ -5,12 +5,6 @@ import {
 } from "react-native-reanimated";
 import "./global.css";
 
-// Disable Reanimated strict mode warnings caused by NativeWind v4 internal style animations
-configureReanimatedLogger({
-  level: ReanimatedLogLevel.warn,
-  strict: false,
-});
-
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BoxProvider } from "@/contexts/BoxContext";
 import { InventoryProvider } from "@/contexts/InventoryContext";
@@ -27,7 +21,18 @@ import { useFonts } from "expo-font";
 import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Text, View, LogBox } from "react-native";
+
+// Disable Reanimated strict mode warnings caused by NativeWind v4 internal style animations
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
+
+// Ignore third-party deprecation warnings spamming the console
+LogBox.ignoreLogs([
+  "SafeAreaView has been deprecated and will be removed in a future release",
+]);
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
@@ -78,7 +83,7 @@ function RootLayoutNav() {
   if (isLoading || isConnected === null) {
     return (
       <View className="flex-1 justify-center items-center bg-white/70 dark:bg-gray-950">
-        <ActivityIndicator size="large" color="#8b5cf6" />
+        <ActivityIndicator size="large" color="#070fff" />
         <Text className="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-4">
           Loading...
         </Text>
@@ -87,23 +92,21 @@ function RootLayoutNav() {
   }
 
   return (
-    <>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="register" />
-          <Stack.Screen
-            name="activationpage"
-            options={{
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-      </ThemeProvider>
-    </>
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="register" />
+        <Stack.Screen
+          name="activationpage"
+          options={{
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+    </ThemeProvider>
   );
 }
 

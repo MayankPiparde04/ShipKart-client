@@ -2,6 +2,11 @@ const os = require("os");
 const fs = require("fs");
 const path = require("path");
 
+if (process.env.NODE_ENV === "production" || process.env.EAS_BUILD) {
+  console.log("[Auto-IP] Production/EAS build detected. Skipping local IP injection.");
+  process.exit(0);
+}
+
 function getLocalIpAddress() {
   const interfaces = os.networkInterfaces();
   let fallbackIp = "localhost";
@@ -33,7 +38,7 @@ function getLocalIpAddress() {
 const ip = getLocalIpAddress();
 console.log(`[Auto-IP] Detected Local IP address: ${ip}`);
 
-const envPath = path.join(__dirname, "..", ".env");
+const envPath = path.join(process.cwd(), ".env");
 let envContent = "";
 
 if (fs.existsSync(envPath)) {

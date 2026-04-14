@@ -35,6 +35,7 @@ export default function App() {
   const router = useRouter();
   const { predictItemDimensions } = useInventory();
   const [isPredicting, setIsPredicting] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Reset camera state when screen comes into focus
   useFocusEffect(
@@ -172,12 +173,17 @@ export default function App() {
     if (currentImageIndex !== null && capturedImages[currentImageIndex]) {
       const imageUri = capturedImages[currentImageIndex];
       setIsPredicting(true);
+      
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
       try {
         const prediction = await predictItemDimensions(
           imageUri,
           "coin",
           "cm",
           "Product for shipping dimension analysis",
+          controller.signal
         );
         setIsPredicting(false);
 
@@ -203,6 +209,13 @@ export default function App() {
         }
       } catch (error: any) {
         setIsPredicting(false);
+        abortControllerRef.current = null;
+        
+        if (error?.message === 'Prediction cancelled by user') {
+           // User manually aborted it, so just exit cleanly
+           return;
+        }
+
         Alert.alert(
           "AI Analysis Error",
           error?.message ||
@@ -240,23 +253,36 @@ export default function App() {
     setViewMode("capture");
   };
 
+  const terminateAnalysis = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   return (
     <View className="flex-1 bg-black">
       <StatusBar translucent backgroundColor="transparent" style="light" />
 
       {isPredicting && (
         <View className="absolute z-50 inset-0 justify-center items-center bg-black/80 backdrop-blur-sm">
-          <View className="bg-slate-900/90 p-8 rounded-[32px] items-center border border-slate-700 w-3/4">
+          <View className="bg-slate-900/90 p-8 rounded-[32px] items-center border border-slate-700 w-3/4 relative">
+            <TouchableOpacity 
+              className="absolute top-4 right-4 z-50 p-2 bg-slate-800 rounded-full"
+              onPress={terminateAnalysis}
+            >
+              <Ionicons name="close" size={24} color="#94a3b8" />
+            </TouchableOpacity>
             <ActivityIndicator
               size="large"
               color="#818cf8"
               className="mb-6 transform scale-150"
             />
-            <Text className="text-white text-xl font-bold mb-2">
+            <Text className="text-white text-xl font-bold mb-2 text-center">
               Analyzing Item...
             </Text>
             <Text className="text-slate-400 text-center text-sm">
-              Our AI is currently measuring the dimensions of your item
+              Our AI is currently measuring the dimensions, price, and brand of your item.
             </Text>
           </View>
         </View>

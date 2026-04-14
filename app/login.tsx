@@ -207,7 +207,7 @@ const Login = React.memo(() => {
 
             <View className="w-full max-w-lg self-center mt-6">
               <TouchableOpacity className="mb-6 items-center">
-                <Text className="text-primary-600 dark:text-primary-400 font-semibold text-base">
+                <Text className="text-primary-600 dark:text-primary-900 font-semibold text-base">
                   Forgot your password?
                 </Text>
               </TouchableOpacity>

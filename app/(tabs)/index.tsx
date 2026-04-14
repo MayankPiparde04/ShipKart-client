@@ -270,48 +270,7 @@ export default function Home() {
                 </View>
               </View>
 
-              {/* Active Shipments Widget */}
-              <View>
-                <View className="flex-row justify-between items-end mb-4 px-1">
-                  <Text className="text-slate-900 dark:text-white text-xl font-bold tracking-tight">
-                    Active Shipments
-                  </Text>
-                  <TouchableOpacity onPress={() => router.push("/tracking")}>
-                    <Text className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                      View All
-                    </Text>
-                  </TouchableOpacity>
-                </View>
 
-                <TouchableOpacity
-                  className="bg-white dark:bg-[#1e293b] p-5 rounded-[24px] flex-row items-center justify-between shadow-sm border border-slate-100 dark:border-slate-800"
-                  onPress={() => router.push("/tracking")}
-                >
-                  <View className="flex-row items-center">
-                    <View className="bg-indigo-50 dark:bg-indigo-900/30 w-14 h-14 rounded-2xl items-center justify-center mr-4">
-                      <Package
-                        size={28}
-                        color={isDark ? "#818cf8" : "#4f46e5"}
-                      />
-                    </View>
-                    <View>
-                      <Text className="text-slate-900 dark:text-white font-extrabold text-lg mb-0.5">
-                        3 Packages Active
-                      </Text>
-                      <Text className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                        Next delivery: Today, 2:00 PM
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="w-8 h-8 bg-slate-50 dark:bg-slate-800 rounded-full items-center justify-center">
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color={isDark ? "#94a3b8" : "#64748b"}
-                    />
-                  </View>
-                </TouchableOpacity>
-              </View>
 
               {/* Add Item Graph */}
               <View>

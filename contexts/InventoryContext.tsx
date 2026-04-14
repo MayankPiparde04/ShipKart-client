@@ -45,6 +45,7 @@ interface InventoryContextType {
     referenceObject?: string,
     unit?: string,
     additionalContext?: string,
+    signal?: AbortSignal
   ) => Promise<any>;
   removeBoxItem: (data: {
     boxId: string;
@@ -261,6 +262,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     referenceObject?: string,
     unit?: string,
     additionalContext?: string,
+    signal?: AbortSignal
   ) => {
     try {
       console.log("Starting AI prediction with:", {
@@ -281,6 +283,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
         finalReferenceObject,
         finalUnit,
         finalAdditionalContext,
+        signal
       );
 
       console.log("AI prediction successful:", result);

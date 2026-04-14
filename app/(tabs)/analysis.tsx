@@ -99,7 +99,7 @@ export default function Analysis() {
 
   // Tab 2: Select Quantity (Modal)
   const renderSelectQuantityModal = () => {
-    const maxQty = selectedItem?.quantity || 1;
+    const maxQty = selectedItem?.quantity;
     return (
       <Modal
         visible={quantityModalVisible}
