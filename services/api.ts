@@ -17,105 +17,128 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
-// Custom Fetch Wrapper
-const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
-  const { timeout = 30000, params, headers, ...rest } = options;
-  
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
+const createApiError = (message: string, status?: number, data?: any) => {
+  const error = new Error(message) as Error & { status?: number; data?: any };
+  error.status = status;
+  error.data = data;
+  return error;
+};
 
-  let url = `${BASE_URL}${endpoint}`;
-  if (params) {
-    const searchParams = new URLSearchParams(params);
-    url += `?${searchParams.toString()}`;
-  }
+const appendQueryParams = (endpoint: string, params?: Record<string, string>) => {
+  if (!params) return `${BASE_URL}${endpoint}`;
 
-  // Get token
-  let token = await AsyncStorage.getItem('accessToken');
-  
-  const config = {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    } as HeadersInit & Record<string, string>,
-    // Use the provided signal if present, otherwise default to the internal timeout controller
-    signal: rest.signal || controller.signal,
+  const searchParams = new URLSearchParams(params);
+  return `${BASE_URL}${endpoint}?${searchParams.toString()}`;
+};
+
+const buildRequestConfig = (
+  rest: RequestInit,
+  headers: HeadersInit | undefined,
+  signal: AbortSignal,
+  token: string | null,
+) => {
+  const mergedHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  // IMPORTANT: Let React Native set the Content-Type with boundary for FormData
+  if (headers) {
+    Object.assign(mergedHeaders, headers as Record<string, string>);
+  }
+
+  const config: RequestInit & { headers: Record<string, string> } = {
+    ...rest,
+    headers: mergedHeaders,
+    signal: rest.signal || signal,
+  };
+
   if (rest.body instanceof FormData) {
     // @ts-ignore
     delete config.headers["Content-Type"];
   }
 
-  try {
-    let response = await fetch(url, config);
-    clearTimeout(id);
+  return config;
+};
 
-    // Initial check for 401
+const parseResponseData = async (response: Response) =>
+  response.json().catch(() => ({}));
+
+const refreshExpiredRequest = async (
+  url: string,
+  config: RequestInit & { headers: HeadersInit & Record<string, string> },
+) => {
+  try {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    if (!refreshToken) return null;
+
+    const refreshResponse = await fetch(`${BASE_URL}/refresh-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!refreshResponse.ok) return null;
+
+    const data = await parseResponseData(refreshResponse);
+    if (!data.success) return null;
+
+    const { accessToken, refreshToken: newRefreshToken } = data.data;
+    await AsyncStorage.setItem("accessToken", accessToken);
+    if (newRefreshToken) await AsyncStorage.setItem("refreshToken", newRefreshToken);
+
+    const newHeaders = { ...config.headers, Authorization: `Bearer ${accessToken}` };
+    return fetch(url, { ...config, headers: newHeaders });
+  } catch (refreshError) {
+    console.error("Token refresh failed:", refreshError);
+    await AsyncStorage.removeItem("accessToken");
+    await AsyncStorage.removeItem("refreshToken");
+    return null;
+  }
+};
+
+const normalizeError = (data: any, status: number) => {
+  let extractedMessage = data.message || `HTTP Error ${status}`;
+
+  if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+    extractedMessage =
+      data.errors
+        .map((e: any) => e.msg || e.message)
+        .filter(Boolean)
+        .join("\n") || extractedMessage;
+  }
+
+  return createApiError(extractedMessage, status, data);
+};
+
+// Custom Fetch Wrapper
+const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
+  const { timeout = 30000, params, headers, ...rest } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const token = await AsyncStorage.getItem("accessToken");
+    const url = appendQueryParams(endpoint, params);
+    const config = buildRequestConfig(rest, headers, controller.signal, token);
+
+    let response = await fetch(url, config);
     if (response.status === 401) {
-      // Try refreshing token
-      try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
-        if (refreshToken) {
-            const refreshResponse = await fetch(`${BASE_URL}/refresh-token`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ refreshToken })
-            });
-            
-            if (refreshResponse.ok) {
-                const data = await refreshResponse.json();
-                if (data.success) {
-                    const { accessToken, refreshToken: newRefreshToken } = data.data;
-                    await AsyncStorage.setItem('accessToken', accessToken);
-                    if (newRefreshToken) await AsyncStorage.setItem('refreshToken', newRefreshToken);
-                    
-                    // Retry original request with new token
-                    const newHeaders = { ...config.headers, Authorization: `Bearer ${accessToken}` };
-                    response = await fetch(url, { ...config, headers: newHeaders });
-                }
-            } else {
-                // Refresh failed
-                await AsyncStorage.removeItem('accessToken');
-                await AsyncStorage.removeItem('refreshToken');
-            }
-        }
-      } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
-        await AsyncStorage.removeItem('accessToken');
-        await AsyncStorage.removeItem('refreshToken');
+      const retriedResponse = await refreshExpiredRequest(url, config);
+      if (retriedResponse) {
+        response = retriedResponse;
       }
     }
 
-    // Process response
-    const data = await response.json().catch(() => ({}));
+    const data = await parseResponseData(response);
     
-    // Add ok property if not present in data, based on status
     if (!data.success && response.ok) {
-        data.success = true;
+      data.success = true;
     }
     
-    // Normalize error response for nested express-validator arrays
     if (!response.ok) {
-        let extractedMessage = data.message || `HTTP Error ${response.status}`;
-        
-        // If the server responded with an express-validator errors array
-        if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-            extractedMessage = data.errors.map((e: any) => e.msg || e.message).filter(Boolean).join('\n') || extractedMessage;
-        }
-
-        throw {
-            message: extractedMessage,
-            status: response.status,
-            data
-        };
+      throw normalizeError(data, response.status);
     }
     
-    // For axios compatibility, we might want to return { data } structure or just data
-    // The current axios setup returns response.data
     return { data: data };
 
   } catch (error: any) {
@@ -220,10 +243,73 @@ export const apiService = {
   packInventory: async (data: {
     productId: string;
     packedQty: number;
-    cartonsUsed: Array<any>;
+    cartonsUsed: any[];
+    packingMetadata?: Record<string, any>;
   }) => {
     try {
       const response = await api.post('/inventory/pack', data);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  getShipmentTransactions: async (limit = 100) => {
+    try {
+      const response = await api.get("/analytics/transactions", {
+        params: { limit: String(limit) },
+      });
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message, data: [] };
+    }
+  },
+
+  deleteShipmentTransaction: async (id: string) => {
+    try {
+      const response = await api.delete(`/analytics/transactions/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  requestForgotPasswordOtp: async (email: string) => {
+    try {
+      const response = await api.post("/forgot-password", { email });
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  verifyForgotPasswordOtp: async (email: string, otp: string) => {
+    try {
+      const response = await api.post("/verify-forgot-password-otp", {
+        email,
+        otp,
+      });
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  resetPassword: async ({
+    email,
+    otp,
+    newPassword,
+  }: {
+    email: string;
+    otp: string;
+    newPassword: string;
+  }) => {
+    try {
+      const response = await api.post("/reset-password", {
+        email,
+        otp,
+        newPassword,
+      });
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -276,10 +362,7 @@ export const apiService = {
         throw new Error('Prediction cancelled by user');
       }
       console.error('Prediction error:', error.message);
-      throw { 
-        message: error.message,
-        status: error.status 
-      };
+      throw createApiError(error.message, error.status, error.data);
     }
   },
   

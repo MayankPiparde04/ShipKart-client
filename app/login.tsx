@@ -215,7 +215,10 @@ const Login = React.memo(() => {
             </View>
 
             <View className="w-full max-w-lg self-center mt-6">
-              <TouchableOpacity className="mb-6 items-center">
+              <TouchableOpacity
+                className="mb-6 items-center"
+                onPress={() => router.push("/forgot-password")}
+              >
                 <Text className="text-base font-semibold text-azure-500">
                   Forgot your password?
                 </Text>

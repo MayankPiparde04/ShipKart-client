@@ -7,6 +7,7 @@ import "./global.css";
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BoxProvider } from "@/contexts/BoxContext";
+import { HistoryProvider } from "@/contexts/HistoryContext";
 import { InventoryProvider } from "@/contexts/InventoryContext";
 import { OptimalProvider } from "@/contexts/OptimalContext";
 import AppErrorBoundary from "@/components/ui/AppErrorBoundary";
@@ -131,6 +132,8 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reset-password" />
         <Stack.Screen
           name="activationpage"
           options={{
@@ -150,9 +153,11 @@ export default function RootLayout() {
         <AuthProvider>
           <InventoryProvider>
             <BoxProvider>
-              <OptimalProvider>
-                <RootLayoutNav />
-              </OptimalProvider>
+              <HistoryProvider>
+                <OptimalProvider>
+                  <RootLayoutNav />
+                </OptimalProvider>
+              </HistoryProvider>
             </BoxProvider>
           </InventoryProvider>
         </AuthProvider>

@@ -1,13 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { memo } from "react";
 import {
   FlatList,
   RefreshControl,
+  Pressable,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Package, PackagePlus } from "lucide-react-native";
+import { Package, PackagePlus, Trash2 } from "lucide-react-native";
 import SkeletonCard from "../ui/SkeletonCard";
 
 interface Box {
@@ -25,35 +25,79 @@ interface BoxListProps {
   isLoading: boolean;
   onRefresh: () => void;
   onBoxPress: (box: Box) => void;
+  onDeletePress: (box: Box) => void;
   onAddPress: () => void;
-  tabBarHeight?: number;
 }
 
 const BoxListItem = memo(function BoxListItem({
   item,
   onPress,
+  onDelete,
 }: {
   item: Box;
   onPress: () => void;
+  onDelete: () => void;
 }) {
   return (
     <TouchableOpacity
-      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 p-4"
+      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-4 py-4"
       onPress={onPress}
     >
-      <View className="flex-row items-center">
-        <View className="mr-4 rounded-full bg-azure-500/15 p-3">
+      <View className="flex-row items-center justify-between gap-4">
+        <View className="mr-1 rounded-full bg-azure-500/15 p-3">
           <Package size={24} strokeWidth={1.5} color="#007FFF" />
         </View>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-azure-50">{item.box_name}</Text>
-          <Text className="text-sm text-azure-200">
-            {item.length}x{item.breadth}x{item.height} cm • Max {item.max_weight}kg
+          <Text className="mb-1 text-lg font-semibold text-azure-50">
+            {item.box_name}
           </Text>
+          <Text className="mb-3 text-sm text-azure-200">
+            Shipping container
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
+              <Text className="text-xs text-azure-200">
+                {item.length}x{item.breadth}x{item.height} cm
+              </Text>
+            </View>
+            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
+              <Text className="text-xs text-azure-200">
+                Max {item.max_weight}kg
+              </Text>
+            </View>
+          </View>
         </View>
-        <View className="items-end">
-          <Text className="text-2xl font-bold text-[#00F6FF]">{item.quantity}</Text>
-          <Text className="text-xs text-azure-200">in stock</Text>
+        <View className="w-24 items-end self-stretch">
+          <View className="w-full items-end">
+            <Text className="text-xs uppercase tracking-[1px] text-azure-200">
+              Stock
+            </Text>
+          </View>
+          <View className="mt-2 w-full items-end">
+            <Text className="text-2xl font-bold text-azure-50">
+              {item.quantity}
+            </Text>
+          </View>
+
+          <View className="mt-auto w-full items-end pt-3">
+            <Pressable
+              onPress={onDelete}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${item.box_name}`}
+              style={({ pressed }) => ({
+                height: 40,
+                width: 40,
+                borderRadius: 999,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? "rgba(239, 68, 68, 0.16)" : "transparent",
+                borderWidth: 1,
+                borderColor: pressed ? "rgba(239, 68, 68, 0.35)" : "rgba(5, 65, 97, 0.35)",
+              })}
+            >
+              <Trash2 size={18} strokeWidth={1.5} color="#EF4444" />
+            </Pressable>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -65,8 +109,8 @@ export default function BoxList({
   isLoading,
   onRefresh,
   onBoxPress,
+  onDeletePress,
   onAddPress,
-  tabBarHeight = 0,
 }: Readonly<BoxListProps>) {
   if (isLoading) {
     return (
@@ -92,7 +136,13 @@ export default function BoxList({
         windowSize={7}
         removeClippedSubviews
         contentContainerStyle={{ padding: 16 }}
-        renderItem={({ item }) => <BoxListItem item={item} onPress={() => onBoxPress(item)} />}
+        renderItem={({ item }) => (
+          <BoxListItem
+            item={item}
+            onPress={() => onBoxPress(item)}
+            onDelete={() => onDeletePress(item)}
+          />
+        )}
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
             <Package size={64} strokeWidth={1.5} color="#99CCFF" />
@@ -109,13 +159,6 @@ export default function BoxList({
           </View>
         }
       />
-      <TouchableOpacity
-        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full border border-azure-400/40 bg-azure-500"
-        style={{ bottom: tabBarHeight + 16 }}
-        onPress={onAddPress}
-      >
-        <Ionicons name="add" size={30} color="white" />
-      </TouchableOpacity>
     </View>
   );
 }

@@ -16,15 +16,15 @@ interface SnackbarContextValue {
 const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
 const stylesByType: Record<SnackbarType, string> = {
-  info: "border-amber-400/40 bg-navy-900",
-  success: "border-[#00F6FF]/40 bg-[#001933]",
-  error: "border-[#A34A3C]/45 bg-[#231815]",
+  info: "border-[#007FFF]/45 bg-[#001933]",
+  success: "border-[#007FFF]/55 bg-[#001933]",
+  error: "border-[#FFB347]/55 bg-[#2A1E08]",
 };
 
 const textByType: Record<SnackbarType, string> = {
-  info: "text-azure-200",
-  success: "text-[#00F6FF]",
-  error: "text-[#FFB38F]",
+  info: "text-white",
+  success: "text-white",
+  error: "text-[#FFB347]",
 };
 
 export function SnackbarProvider({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -68,7 +68,7 @@ export function SnackbarProvider({ children }: Readonly<{ children: React.ReactN
           <SafeAreaView pointerEvents="box-none" className="absolute bottom-0 left-0 right-0 z-[200] px-4 pb-4">
             <Animated.View
               style={{ transform: [{ translateY: slideY }] }}
-              className={`rounded-card border px-4 py-3 ${stylesByType[message.type]}`}
+              className={`rounded-card border px-4 py-3 shadow-azure-glow ${stylesByType[message.type]}`}
             >
               <Text className={`text-center text-sm font-medium ${textByType[message.type]}`}>
                 {message.text}

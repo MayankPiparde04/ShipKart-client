@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -18,39 +18,99 @@ import api from "@/services/api";
 
 export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [overview, setOverview] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const { width } = useWindowDimensions();
   const chartWidth = Math.max(width - 72, 220);
 
-  useEffect(() => {
-    fetchData();
+  const getFivePartScale = (maxValue: number) => {
+    if (!Number.isFinite(maxValue) || maxValue <= 0) {
+      return { step: 20, roundedMax: 100 };
+    }
+
+    let step;
+    if (maxValue <= 100) {
+      step = 20;
+    } else if (maxValue <= 500) {
+      step = 100;
+    } else if (maxValue <= 1000) {
+      step = 200;
+    } else if (maxValue <= 2500) {
+      step = 500;
+    } else if (maxValue <= 5000) {
+      step = 1000;
+    } else {
+      step = 2000;
+    }
+
+    const roundedMax = Math.ceil(maxValue / step) * step;
+    return { step, roundedMax };
+  };
+
+  const historyMax = useMemo(
+    () => Math.max(0, ...history.map((d) => Number(d.count) || 0)),
+    [history],
+  );
+  const historyChartScale = useMemo(
+    () => getFivePartScale(historyMax),
+    [historyMax],
+  );
+
+  const historyLabels = useMemo(
+    () => history.map((d, index) => (index % 2 === 0 ? d.day : "")),
+    [history],
+  );
+
+  const chartConfig = useMemo(
+    () => ({
+      backgroundGradientFrom: "#001933",
+      backgroundGradientTo: "#001933",
+      color: (opacity = 1) => `rgba(0, 127, 255, ${opacity})`,
+      strokeWidth: 2,
+      barPercentage: 0.5,
+      useShadowColorFromDataset: false,
+    }),
+    [],
+  );
+
+  const fetchData = useCallback(async () => {
+    setErrorMessage("");
+
+    const [overviewRes, historyRes] = await Promise.all([
+      api.get("/analytics/overview"),
+      api.get("/analytics/packing-history"),
+    ]);
+
+    if (overviewRes.data.success) setOverview(overviewRes.data.data);
+    if (historyRes.data.success) setHistory(historyRes.data.data);
   }, []);
 
-  const fetchData = async () => {
-    try {
-      const [overviewRes, historyRes] = await Promise.all([
-        api.get("/analytics/overview"),
-        api.get("/analytics/packing-history"),
-      ]);
+  useEffect(() => {
+    let isMounted = true;
 
-      if (overviewRes.data.success) setOverview(overviewRes.data.data);
-      if (historyRes.data.success) setHistory(historyRes.data.data);
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const load = async () => {
+      try {
+        await fetchData();
+      } catch (error: any) {
+        if (isMounted) {
+          setErrorMessage(
+            error?.message || "Unable to load analytics right now. Please try again.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-  const chartConfig = {
-    backgroundGradientFrom: "#001933",
-    backgroundGradientTo: "#001933",
-    color: (opacity = 1) => `rgba(0, 127, 255, ${opacity})`,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-  };
+    load();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchData]);
 
   const hasHistoryData = history.some((d) => (d.count ?? 0) > 0);
   const hasInventoryData =
@@ -79,6 +139,30 @@ export default function AnalyticsDashboard() {
       </View>
 
       <ScrollView className="flex-1 px-4 py-6">
+        {errorMessage ? (
+          <View className="mb-5 rounded-card border border-[#D58F3C]/30 bg-[#D58F3C]/10 px-4 py-3">
+            <Text className="text-sm font-medium text-amber-200">{errorMessage}</Text>
+            <TouchableOpacity
+              className="mt-3 self-start rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
+              onPress={async () => {
+                setLoading(true);
+                try {
+                  await fetchData();
+                  setErrorMessage("");
+                } catch (retryError: any) {
+                  setErrorMessage(
+                    retryError?.message || "Retry failed. Please check connection and try again.",
+                  );
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              <Text className="font-semibold text-white">Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Overview Grid */}
         <View className="flex-row flex-wrap gap-3 mb-6">
           <View className="w-[48%] rounded-card border border-navy-800/30 bg-navy-900 p-4">
@@ -122,12 +206,12 @@ export default function AnalyticsDashboard() {
           </Text>
           {hasHistoryData ? (
             <View
-              className="items-center justify-center rounded-card border border-navy-800/30 bg-navy-900 p-4"
+              className="w-full overflow-hidden rounded-card border border-navy-800/30 bg-navy-900"
               style={{ aspectRatio: 16 / 9 }}
             >
               <LineChart
                 data={{
-                  labels: history.map((d) => d.day),
+                  labels: historyLabels,
                   datasets: [
                     {
                       data: history.map((d) => d.count),
@@ -138,7 +222,8 @@ export default function AnalyticsDashboard() {
                 height={190}
                 yAxisLabel=""
                 yAxisSuffix=""
-                yAxisInterval={1}
+                fromNumber={historyChartScale.roundedMax}
+                segments={5}
                 chartConfig={{
                   backgroundColor: "#001933",
                   backgroundGradientFrom: "#001933",
@@ -154,10 +239,17 @@ export default function AnalyticsDashboard() {
                     strokeWidth: "2",
                     stroke: "#00F6FF",
                   },
+                  propsForBackgroundLines: {
+                    stroke: "rgba(5, 65, 97, 0.35)",
+                    strokeWidth: 1,
+                    strokeDasharray: "4",
+                  },
+                  formatYLabel: (value: string | number) =>
+                    String(Math.round(Number(value) || 0)),
                 }}
                 bezier
                 style={{
-                  marginVertical: 8,
+                  marginVertical: 0,
                   borderRadius: 16,
                 }}
               />

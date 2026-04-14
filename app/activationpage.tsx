@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const otpSlots = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"] as const;
+const OTP_VALIDITY_SECONDS = 5 * 60;
 
 export default function ActivationPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function ActivationPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState("");
-  const [timeLeft, setTimeLeft] = useState(30 * 60); // 30 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(OTP_VALIDITY_SECONDS);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -123,7 +124,7 @@ export default function ActivationPage() {
           "OTP Sent",
           "A new 6-digit OTP has been sent to your inbox.",
         );
-        setTimeLeft(30 * 60); // Reset timer
+        setTimeLeft(OTP_VALIDITY_SECONDS);
         setOtp(["", "", "", "", "", ""]); // clear OTP inputs
         setError("");
         inputRefs.current[0]?.focus(); // focus first box
@@ -147,19 +148,27 @@ export default function ActivationPage() {
       return;
     }
 
-    // Set up countdown timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           return 0;
         }
+
         return prev - 1;
       });
     }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
     };
   }, [email, router]);
 
@@ -228,7 +237,7 @@ export default function ActivationPage() {
                       focus:border-azure-500 focus:bg-navy-950`}
                     maxLength={1}
                     keyboardType="number-pad"
-                    value={digit}
+                    value={otp[index] || ""}
                     onChangeText={(v) => handleOtpChange(v, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
                   />

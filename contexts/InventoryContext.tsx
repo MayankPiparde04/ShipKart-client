@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -157,7 +158,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
         sortOrder: "asc",
       });
 
-      if (response.success && response.data && response.data.items) {
+      if (response.success && response.data?.items) {
         // Clean items to match Item interface
         const cleanedItems = response.data.items.map((item: any) => ({
           _id: item._id,
@@ -208,7 +209,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const addItem = async (item: Omit<Item, "_id">) => {
     const response = await apiService.addOrUpdateItem(item);
     if (response.success) {
-      if (response.data && response.data.item) {
+      if (response.data?.item) {
         const newItems = [...items, response.data.item];
         setItems(newItems);
         await saveItemsToStorage(newItems);
@@ -265,13 +266,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     signal?: AbortSignal
   ) => {
     try {
-      console.log("Starting AI prediction with:", {
-        imageUri,
-        referenceObject,
-        unit,
-        additionalContext,
-      });
-
       // Set default values if not provided
       const finalReferenceObject = referenceObject || "coin";
       const finalUnit = unit || "cm";
@@ -285,8 +279,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
         finalAdditionalContext,
         signal
       );
-
-      console.log("AI prediction successful:", result);
       return result;
     } catch (error: any) {
       console.error("AI prediction failed:", error);
@@ -330,23 +322,38 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const contextValue = useMemo(
+    () => ({
+      items,
+      isLoading,
+      lastFetch: null,
+      dailyData,
+      dailySold,
+      fetchItems,
+      addItem,
+      updateItem,
+      removeItem,
+      clearCache,
+      predictItemDimensions,
+      removeBoxItem,
+    }),
+    [
+      items,
+      isLoading,
+      dailyData,
+      dailySold,
+      fetchItems,
+      addItem,
+      updateItem,
+      removeItem,
+      clearCache,
+      predictItemDimensions,
+      removeBoxItem,
+    ],
+  );
+
   return (
-    <InventoryContext.Provider
-      value={{
-        items,
-        isLoading,
-        lastFetch: null,
-        dailyData,
-        dailySold,
-        fetchItems,
-        addItem,
-        updateItem,
-        removeItem,
-        clearCache,
-        predictItemDimensions,
-        removeBoxItem,
-      }}
-    >
+    <InventoryContext.Provider value={contextValue}>
       {children}
     </InventoryContext.Provider>
   );

@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -86,7 +87,7 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
         // Add sort if needed, e.g. sortBy: 'box_name', sortOrder: 'asc'
       });
 
-      if (response.success && response.data && response.data.boxes) {
+      if (response.success && response.data?.boxes) {
         // Only keep fields defined in Box interface
         const cleanedBoxes = response.data.boxes.map((box: any) => ({
           _id: box._id,
@@ -102,7 +103,6 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
       } else if (response.data === null) {
         // Handle 304 responses - keep existing data
         // Data not modified, so no need to update state
-        console.log("Data not modified, using cached data");
       }
     } catch (error) {
       console.error("Error fetching boxes:", error);
@@ -112,10 +112,10 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const addBox = async (box: Omit<Box, "_id">) => {
+  const addBox = useCallback(async (box: Omit<Box, "_id">) => {
     const response = await apiService.addBox(box);
     if (response.success) {
-      if (response.data && response.data.box) {
+      if (response.data?.box) {
         const newBoxes = [...boxes, response.data.box];
         setBoxes(newBoxes);
         await saveBoxesToStorage(newBoxes);
@@ -125,9 +125,9 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     } else {
       throw new Error(response.message || "Failed to add box");
     }
-  };
+  }, [boxes, fetchBoxes]);
 
-  const updateBoxQuantity = async (
+  const updateBoxQuantity = useCallback(async (
     box_name: string,
     additionalQuantity: number,
   ) => {
@@ -146,9 +146,9 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     } else {
       throw new Error(response.message || "Failed to update box quantity");
     }
-  };
+  }, [boxes]);
 
-  const removeBox = async (id: string) => {
+  const removeBox = useCallback(async (id: string) => {
     const response = await apiService.deleteBox(id);
     if (response.success) {
       const filteredBoxes = boxes.filter((box) => box._id !== id);
@@ -157,40 +157,52 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     } else {
       throw new Error(response.message || "Failed to delete box");
     }
-  };
+  }, [boxes]);
 
-  const clearCache = async () => {
+  const clearCache = useCallback(async () => {
     try {
       await AsyncStorage.removeItem(BOXES_STORAGE_KEY);
       setBoxes([]);
     } catch (error) {
       console.error("Error clearing boxes from storage:", error);
     }
-  };
+  }, []);
 
-  const updateBox = async (id: string, boxUpdate: Partial<Box>) => {
+  const updateBox = useCallback(async (id: string, boxUpdate: Partial<Box>) => {
     const response = await apiService.updateBox(id, boxUpdate);
     if (response.success) {
       await fetchBoxes();
     } else {
       throw new Error(response.message || "Failed to update box");
     }
-  };
+  }, [fetchBoxes]);
+
+  const contextValue = useMemo(
+    () => ({
+      boxes,
+      isLoading,
+      lastFetch: null,
+      fetchBoxes,
+      addBox,
+      updateBoxQuantity,
+      removeBox,
+      clearCache,
+      updateBox,
+    }),
+    [
+      boxes,
+      isLoading,
+      fetchBoxes,
+      addBox,
+      updateBoxQuantity,
+      removeBox,
+      clearCache,
+      updateBox,
+    ],
+  );
 
   return (
-    <BoxContext.Provider
-      value={{
-        boxes,
-        isLoading,
-        lastFetch: null,
-        fetchBoxes,
-        addBox,
-        updateBoxQuantity,
-        removeBox,
-        clearCache,
-        updateBox, // <-- add this
-      }}
-    >
+    <BoxContext.Provider value={contextValue}>
       {children}
     </BoxContext.Provider>
   );

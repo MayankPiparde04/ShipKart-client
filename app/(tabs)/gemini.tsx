@@ -5,6 +5,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { X, Zap } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +22,7 @@ import { StatusBar } from "expo-status-bar";
 export default function App() {
   const { showSnackbar } = useSnackbar();
   const [facing, setFacing] = useState<CameraType>("back");
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [isCameraReady, setCameraReady] = useState(false);
@@ -41,6 +43,7 @@ export default function App() {
     if (!isFocused) {
       setCameraReady(false);
       setCameraTimedOut(false);
+      setTorchEnabled(false);
     }
   }, [isFocused]);
 
@@ -271,8 +274,12 @@ export default function App() {
     }
   };
 
+  const closeScanner = () => {
+    router.replace("/(tabs)");
+  };
+
   return (
-    <View className="flex-1 bg-navy-950">
+    <View className="flex-1 bg-black">
       <StatusBar translucent backgroundColor="transparent" style="light" />
 
       {isPredicting && (
@@ -299,111 +306,108 @@ export default function App() {
         </View>
       )}
 
-      {/* Main View Area */}
-      <View
-        className="flex-1 overflow-hidden"
-        style={{ borderBottomLeftRadius: 40, borderBottomRightRadius: 40 }}
-      >
-        {viewMode === "capture" ? (
-          <View className="flex-1 relative ">
-            {!isCameraReady && (
-              <View className="absolute inset-0 z-10 flex items-center justify-center ">
-                <ActivityIndicator
-                  size="large"
-                  color="#007FFF"
-                  className="mb-4"
-                />
-                <Text className="font-medium text-azure-50">
-                  {cameraTimedOut
-                    ? "Scanner is taking longer than expected"
-                    : "Initializing scanner..."}
-                </Text>
-                {cameraTimedOut && (
-                  <TouchableOpacity
-                    className="mt-4 rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
-                    onPress={() => {
-                      setCameraReady(false);
-                      setCameraTimedOut(false);
-                    }}
-                  >
-                    <Text className="text-sm font-semibold text-white">Retry</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {isFocused ? (
-              <CameraView
-                ref={cameraRef}
-                className="flex-1"
-                style={{ width: "100%", height: "100%" }}
-                facing={facing}
-                onCameraReady={onCameraReady}
-                onMountError={onCameraError}
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center bg-navy-900">
-                <Text className="text-azure-200">Camera paused</Text>
-              </View>
-            )}
-
-            {/* Viewfinder Overlay */}
-            <View className="absolute inset-0 z-10 flex-1 justify-center items-center p-8 pointer-events-none">
-              <View className="w-full aspect-square border-2 border-white/50 rounded-[40px] relative">
-                <View className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-white rounded-tl-[40px]" />
-                <View className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-white rounded-tr-[40px]" />
-                <View className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-white rounded-bl-[40px]" />
-                <View className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-white rounded-br-[40px]" />
-              </View>
-              <Text className="text-white/80 font-medium text-center mt-8  px-4 py-2 rounded-full">
-                Position item clearly within the frame
-              </Text>
+      {viewMode === "capture" ? (
+        <View className="flex-1">
+          {isFocused ? (
+            <CameraView
+              ref={cameraRef}
+              className="flex-1"
+              style={{ width: "100%", height: "100%" }}
+              facing={facing}
+              enableTorch={torchEnabled}
+              onCameraReady={onCameraReady}
+              onMountError={onCameraError}
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center bg-navy-900">
+              <Text className="text-azure-200">Camera paused</Text>
             </View>
-          </View>
-        ) : (
-          <View className="flex-1 justify-center items-center relative">
-            {currentImageIndex !== null && capturedImages[currentImageIndex] ? (
-              <>
-                <Image
-                  source={{ uri: capturedImages[currentImageIndex] }}
-                  className="w-full h-full"
-                  resizeMode="contain"
-                />
-                <View className="absolute top-16 left-6 z-10">
-                  <TouchableOpacity
-                    className="h-12 w-12 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
-                    onPress={backToCapture}
-                  >
-                    <Ionicons name="close" size={24} color="white" />
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <View className="flex-1 justify-center items-center">
-                <Text className="mb-6 text-lg text-azure-200">
-                  No image available
-                </Text>
-                <TouchableOpacity
-                  className="rounded-full border border-azure-400/40 bg-azure-500 px-8 py-4"
-                  onPress={backToCapture}
-                >
-                  <Text className="text-white font-bold text-base">
-                    Return to Camera
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
+          )}
 
-      {/* Controls Area */}
-      <View className="h-[22%] justify-center bg-navy-950 pb-6">
-        {viewMode === "capture" ? (
-          <View className="flex-1 justify-center">
-            {/* Captured Images Preview Strip */}
+          {/* Header Floating Controls */}
+          <SafeAreaView pointerEvents="box-none" className="absolute inset-x-0 top-0 z-30 px-6 pt-2">
+            <View className="flex-row items-center justify-between">
+              <TouchableOpacity
+                className="h-12 w-12 items-center justify-center rounded-full border border-[#054161]/70 bg-[#001224]/85"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
+                onPress={closeScanner}
+              >
+                <X size={22} color="#E5F2FF" strokeWidth={2} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="h-12 w-12 items-center justify-center rounded-full border border-[#054161]/70 bg-[#001224]/85"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
+                onPress={() => setTorchEnabled((current) => !current)}
+              >
+                <Zap
+                  size={20}
+                  strokeWidth={2}
+                  color={torchEnabled ? "#007FFF" : "#E5F2FF"}
+                  fill={torchEnabled ? "rgba(0,127,255,0.2)" : "transparent"}
+                />
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+
+          {/* Viewfinder Overlay with dimmed surroundings */}
+          <View className="pointer-events-none absolute inset-0 z-20 items-center justify-center px-8">
+            <View className="w-full max-w-[340px] aspect-square">
+              <View className="absolute -top-[999px] left-0 right-0 bottom-full bg-black/50" />
+              <View className="absolute top-full left-0 right-0 -bottom-[999px] bg-black/50" />
+              <View className="absolute top-0 bottom-0 -left-[999px] right-full bg-black/50" />
+              <View className="absolute top-0 bottom-0 left-full -right-[999px] bg-black/50" />
+
+              <View className="absolute inset-0 rounded-[36px] border-2 border-white/55" />
+              <View className="absolute left-0 top-0 h-16 w-16 rounded-tl-[36px] border-l-4 border-t-4 border-white" />
+              <View className="absolute right-0 top-0 h-16 w-16 rounded-tr-[36px] border-r-4 border-t-4 border-white" />
+              <View className="absolute bottom-0 left-0 h-16 w-16 rounded-bl-[36px] border-b-4 border-l-4 border-white" />
+              <View className="absolute bottom-0 right-0 h-16 w-16 rounded-br-[36px] border-b-4 border-r-4 border-white" />
+            </View>
+
+            <Text className="mt-8 rounded-full bg-[#001224]/70 px-4 py-2 text-center font-medium text-white/85">
+              Position item clearly within the frame
+            </Text>
+          </View>
+
+          {!isCameraReady && (
+            <View className="absolute inset-0 z-40 items-center justify-center bg-[#001224]/68">
+              <ActivityIndicator size="large" color="#007FFF" />
+              <Text className="mt-4 text-center font-medium text-azure-50">
+                {cameraTimedOut
+                  ? "Scanner is taking longer than expected"
+                  : "Initializing scanner..."}
+              </Text>
+              {cameraTimedOut && (
+                <TouchableOpacity
+                  className="mt-4 rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
+                  onPress={() => {
+                    setCameraReady(false);
+                    setCameraTimedOut(false);
+                  }}
+                >
+                  <Text className="text-sm font-semibold text-white">Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Bottom floating controls */}
+          <View className="absolute inset-x-0 bottom-10 z-30 px-8">
             {capturedImages.length > 0 && (
-              <View className="h-20 mb-4 px-6 justify-center">
+              <View className="mb-4 h-20 justify-center">
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {capturedImages.map((image, index) => (
                     <TouchableOpacity
@@ -414,65 +418,117 @@ export default function App() {
                       }}
                       className={`mr-3 overflow-hidden rounded-2xl border-2 ${currentImageIndex === index ? "border-azure-500" : "border-navy-800/40"}`}
                     >
-                      <Image
-                        source={{ uri: image }}
-                        className="w-16 h-16"
-                        resizeMode="cover"
-                      />
+                      <Image source={{ uri: image }} className="h-16 w-16" resizeMode="cover" />
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
             )}
 
-            {/* Main Controls */}
-            <View className="flex-row justify-between items-center px-10">
+            <View className="flex-row items-center justify-between">
               <TouchableOpacity
-                className="h-14 w-14 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
+                className="h-14 w-14 items-center justify-center rounded-full border border-[#054161]/70 bg-[#001224]/85"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
                 onPress={pickImage}
               >
-                <Ionicons name="images" size={24} color="white" />
+                <Ionicons name="images" size={24} color="#E5F2FF" />
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={{ width: 96, height: 96 }}
+                style={{
+                  width: 96,
+                  height: 96,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 10,
+                }}
                 className="items-center justify-center rounded-full border-4 border-azure-400"
                 onPress={takePicture}
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 activeOpacity={0.7}
               >
-                <View
-                  style={{ width: 76, height: 76 }}
-                  className="rounded-full bg-azure-500"
-                />
+                <View style={{ width: 76, height: 76 }} className="rounded-full bg-azure-500" />
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="h-14 w-14 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
+                className="h-14 w-14 items-center justify-center rounded-full border border-[#054161]/70 bg-[#001224]/85"
+                style={{
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 10,
+                  elevation: 8,
+                }}
                 onPress={toggleCameraFacing}
               >
-                <Ionicons name="camera-reverse" size={24} color="white" />
+                <Ionicons name="camera-reverse" size={24} color="#E5F2FF" />
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
-          <View className="flex-1 flex-row justify-center items-center space-x-12">
-            <TouchableOpacity
-              className="h-20 w-20 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
-              onPress={rejectImage}
-            >
-              <Ionicons name="trash" size={32} color="#99CCFF" />
-            </TouchableOpacity>
+        </View>
+      ) : (
+        <View className="flex-1 items-center justify-center bg-black">
+          {currentImageIndex !== null && capturedImages[currentImageIndex] ? (
+            <>
+              <Image
+                source={{ uri: capturedImages[currentImageIndex] }}
+                className="h-full w-full"
+                resizeMode="contain"
+              />
 
-            <TouchableOpacity
-              className="h-20 w-20 items-center justify-center rounded-full border border-azure-400/45 bg-azure-500"
-              onPress={acceptImage}
-            >
-              <Ionicons name="checkmark-done" size={38} color="white" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+              <SafeAreaView pointerEvents="box-none" className="absolute inset-x-0 top-0 z-20 px-6 pt-2">
+                <TouchableOpacity
+                  className="h-12 w-12 items-center justify-center rounded-full border border-[#054161]/70 bg-[#001224]/85"
+                  style={{
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 10,
+                    elevation: 8,
+                  }}
+                  onPress={backToCapture}
+                >
+                  <X size={22} color="#E5F2FF" strokeWidth={2} />
+                </TouchableOpacity>
+              </SafeAreaView>
+
+              <View className="absolute inset-x-0 bottom-10 z-20 flex-row items-center justify-center gap-12">
+                <TouchableOpacity
+                  className="h-20 w-20 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
+                  onPress={rejectImage}
+                >
+                  <Ionicons name="trash" size={32} color="#99CCFF" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="h-20 w-20 items-center justify-center rounded-full border border-azure-400/45 bg-azure-500"
+                  onPress={acceptImage}
+                >
+                  <Ionicons name="checkmark-done" size={38} color="white" />
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View className="flex-1 items-center justify-center">
+              <Text className="mb-6 text-lg text-azure-200">No image available</Text>
+              <TouchableOpacity
+                className="rounded-full border border-azure-400/40 bg-azure-500 px-8 py-4"
+                onPress={backToCapture}
+              >
+                <Text className="text-base font-bold text-white">Return to Camera</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }

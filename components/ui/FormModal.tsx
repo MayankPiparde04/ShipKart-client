@@ -34,10 +34,10 @@ export default function FormModal({
       hardwareAccelerated
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-[#001224]/70">
-        <View className="h-[85%] rounded-t-card border border-navy-800/30 bg-navy-900">
+      <View className="flex-1 justify-end bg-[#001224]/80">
+        <View className="h-[85%] rounded-t-card border border-[rgba(5,65,97,0.5)] bg-navy-900">
           <SafeAreaView className="flex-1">
-            <View className="flex-row items-center justify-between border-b border-navy-800/30 px-6 py-4">
+            <View className="flex-row items-center justify-between border-b border-[rgba(5,65,97,0.5)] px-6 py-4">
               <Text className="text-2xl font-bold text-azure-50">
                 {title}
               </Text>
@@ -53,6 +53,7 @@ export default function FormModal({
               <ScrollView
                 className="flex-1 px-6 pt-4"
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{ paddingBottom: 40 }}
               >
                 {children}

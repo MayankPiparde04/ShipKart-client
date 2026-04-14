@@ -60,7 +60,5 @@ files.forEach(file => {
       }
     }
     fs.writeFileSync(file, content, 'utf8');
-    console.log(`Updated ${file}`);
   }
 });
-console.log('Cleanup complete');

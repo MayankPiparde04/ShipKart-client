@@ -392,7 +392,10 @@ export default function QuickPack() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView className="space-y-4">
+            <ScrollView
+              className="space-y-4"
+              keyboardShouldPersistTaps="handled"
+            >
               <View>
                 <Text className="mb-1 text-azure-200">Name</Text>
                 <TextInput

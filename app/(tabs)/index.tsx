@@ -12,6 +12,7 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -25,9 +26,10 @@ import { BarChart } from "react-native-chart-kit";
 
 export default function Home() {
   const { user } = useAuth();
-  const { items, dailyData, dailySold } = useInventory();
-  const { boxes } = useBoxes();
+  const { items, dailyData, dailySold, fetchItems } = useInventory();
+  const { boxes, fetchBoxes } = useBoxes();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Memoize chart data to prevent unnecessary recalculations
   const addItemData = useMemo(
@@ -41,6 +43,11 @@ export default function Home() {
     [dailyData],
   );
 
+  const addItemLabels = useMemo(
+    () => addItemData.map((entry, index) => (index % 2 === 0 ? entry.label : "")),
+    [addItemData],
+  );
+
   const sellItemData = useMemo(
     () =>
       Array.isArray(dailySold)
@@ -52,9 +59,23 @@ export default function Home() {
     [dailySold],
   );
 
+  const sellItemLabels = useMemo(
+    () => sellItemData.map((entry, index) => (index % 2 === 0 ? entry.label : "")),
+    [sellItemData],
+  );
+
   useEffect(() => {
     setLoading(false);
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchItems(), fetchBoxes()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const totalQuantity = useMemo(
     () =>
@@ -67,15 +88,41 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   const screenWidth = Dimensions.get("window").width;
-  const chartWidth = screenWidth > 600 ? screenWidth - 132 : screenWidth - 88;
+  const chartWidth = screenWidth - 48;
 
-  const formatChartData = useMemo(
-    () => (data: any[]) => ({
-      labels: Array.isArray(data) ? data.map((d) => d.label) : [],
-      datasets: [{ data: Array.isArray(data) ? data.map((d) => d.count) : [] }],
-    }),
-    [],
-  );
+  const getFivePartScale = (maxValue: number) => {
+    if (!Number.isFinite(maxValue) || maxValue <= 0) {
+      return { step: 20, roundedMax: 100 };
+    }
+
+    let step;
+    if (maxValue <= 100) {
+      step = 20;
+    } else if (maxValue <= 500) {
+      step = 100;
+    } else if (maxValue <= 1000) {
+      step = 200;
+    } else if (maxValue <= 2500) {
+      step = 500;
+    } else if (maxValue <= 5000) {
+      step = 1000;
+    } else {
+      step = 2000;
+    }
+
+    const roundedMax = Math.ceil(maxValue / step) * step;
+    return { step, roundedMax };
+  };
+
+  const addChartScale = useMemo(() => {
+    const max = Math.max(0, ...addItemData.map((entry) => entry.count));
+    return getFivePartScale(max);
+  }, [addItemData]);
+
+  const sellChartScale = useMemo(() => {
+    const max = Math.max(0, ...sellItemData.map((entry) => entry.count));
+    return getFivePartScale(max);
+  }, [sellItemData]);
 
   // Chart configuration memoized to prevent re-renders
   const chartConfig = useMemo(
@@ -98,25 +145,12 @@ export default function Home() {
         fontSize: 12,
         fontWeight: "600",
       },
-      barPercentage: 0.5,
+      barPercentage: 0.72,
       fillShadowGradient: "#007FFF",
       fillShadowGradientOpacity: 0.8,
+      formatYLabel: (value: string | number) => String(Math.round(Number(value) || 0)),
     }),
     [],
-  );
-
-  const chartStyle = {
-    marginVertical: 8,
-    borderRadius: 24,
-  };
-
-  const addMax = useMemo(
-    () => Math.max(0, ...addItemData.map((entry) => entry.count)),
-    [addItemData],
-  );
-  const soldMax = useMemo(
-    () => Math.max(0, ...sellItemData.map((entry) => entry.count)),
-    [sellItemData],
   );
 
   return (
@@ -129,8 +163,8 @@ export default function Home() {
       >
         {/* Header Section */}
         <View
-          className="z-10 rounded-b-[40px] border-b border-navy-800/30 bg-navy-900 px-6 pb-6 pt-12"
-          style={{ paddingTop: Math.max(insets.top + 16, 48) }}
+          className="z-10 rounded-b-[40px] border-b border-navy-800/30 bg-navy-900 px-6 pb-5 pt-8"
+          style={{ paddingTop: Math.max(insets.top + 8, 34) }}
         >
           <View className="flex-row justify-between items-center mb-6">
             <View>
@@ -179,12 +213,21 @@ export default function Home() {
 
         {/* Scrollable Content */}
         <ScrollView
-          className="flex-1 px-6 -mt-6"
+          className="flex-1 px-6 -mt-4"
           contentContainerStyle={{
-            paddingTop: 48,
+            paddingTop: 24,
             paddingBottom: tabBarHeight + 24,
           }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#007FFF"
+              colors={['#007FFF']}
+              progressBackgroundColor="#001933"
+            />
+          }
         >
           {loading ? (
             <ActivityIndicator
@@ -255,20 +298,24 @@ export default function Home() {
                   Items Added
                 </Text>
                 <View
-                  className="items-center justify-center overflow-hidden rounded-card border border-navy-800/30 bg-navy-900 p-4"
+                  className="w-full overflow-hidden rounded-card border border-navy-800/30 bg-navy-900"
                   style={{ aspectRatio: 16 / 9 }}
                 >
                   {addItemData.length > 0 ? (
                     <BarChart
-                      data={formatChartData(addItemData)}
+                      data={{
+                        labels: addItemLabels,
+                        datasets: [{ data: addItemData.map((d) => d.count) }],
+                      }}
                       width={chartWidth}
                       height={190}
                       yAxisLabel=""
                       yAxisSuffix=""
                       fromZero={true}
-                      segments={Math.max(4, Math.min(10, addMax || 4))}
+                      fromNumber={addChartScale.roundedMax}
+                      segments={5}
                       chartConfig={chartConfig}
-                      style={chartStyle}
+                      style={{ marginVertical: 0 }}
                       withInnerLines={false}
                       showValuesOnTopOfBars={true}
                       withHorizontalLabels={true}
@@ -286,24 +333,28 @@ export default function Home() {
                   Items Sold
                 </Text>
                 <View
-                  className="items-center justify-center overflow-hidden rounded-card border border-navy-800/30 bg-navy-900 p-4"
+                  className="w-full overflow-hidden rounded-card border border-navy-800/30 bg-navy-900"
                   style={{ aspectRatio: 16 / 9 }}
                 >
                   {sellItemData.length > 0 ? (
                     <BarChart
-                      data={formatChartData(sellItemData)}
+                      data={{
+                        labels: sellItemLabels,
+                        datasets: [{ data: sellItemData.map((d) => d.count) }],
+                      }}
                       width={chartWidth}
                       height={190}
                       yAxisLabel=""
                       yAxisSuffix=""
                       fromZero={true}
-                      segments={Math.max(4, Math.min(10, soldMax || 4))}
+                      fromNumber={sellChartScale.roundedMax}
+                      segments={5}
                       chartConfig={{
                         ...chartConfig,
                         color: (opacity = 1) => `rgba(0, 246, 255, ${opacity})`,
                         fillShadowGradient: "#00F6FF",
                       }}
-                      style={chartStyle}
+                      style={{ marginVertical: 0 }}
                       withInnerLines={false}
                       showValuesOnTopOfBars={true}
                       withHorizontalLabels={true}

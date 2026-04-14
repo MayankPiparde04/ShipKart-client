@@ -102,15 +102,14 @@ export default function Analysis() {
         animationType="slide"
         onRequestClose={() => setQuantityModalVisible(false)}
       >
-        <View className="flex-1 justify-center bg-[#001224]/75">
+        <View className="flex-1 justify-center bg-[#001224]/80 px-4">
           <View
             style={{
               backgroundColor: "#001933",
-              padding: 32,
+              padding: 24,
               borderRadius: 24,
-              marginHorizontal: 16,
               borderWidth: 1,
-              borderColor: "rgba(5, 65, 97, 0.3)",
+              borderColor: "rgba(5, 65, 97, 0.5)",
               elevation: 6,
             }}
           >
@@ -158,7 +157,7 @@ export default function Analysis() {
                   paddingVertical: 16,
                   borderRadius: 16,
                   borderWidth: 1,
-                  borderColor: "rgba(5, 65, 97, 0.3)",
+                  borderColor: "rgba(5, 65, 97, 0.5)",
                 }}
                 onPress={() => setQuantityModalVisible(false)}
               >

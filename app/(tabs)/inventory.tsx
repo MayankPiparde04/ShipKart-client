@@ -2,6 +2,8 @@ import AddBoxForm from "@/components/inventory/AddBoxForm";
 import AddItemForm from "@/components/inventory/AddItemForm";
 import BoxList from "@/components/inventory/BoxList";
 import InventoryList from "@/components/inventory/InventoryList";
+import FormModal from "@/components/ui/FormModal";
+import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -9,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Item {
@@ -34,6 +36,7 @@ interface Box {
 }
 
 export default function Inventory() {
+  const { showSnackbar } = useSnackbar();
   // Tab state
   const [activeTab, setActiveTab] = useState<"items" | "boxes">("items");
 
@@ -60,6 +63,11 @@ export default function Inventory() {
 
   // Boxes state
   const [showAddBoxForm, setShowAddBoxForm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<
+    | { kind: "item"; item: Item }
+    | { kind: "box"; box: Box }
+    | null
+  >(null);
   const [newBox, setNewBox] = useState({
     box_name: "",
     length: "",
@@ -85,6 +93,7 @@ export default function Inventory() {
     fetchBoxes,
     addBox,
     updateBox,
+    removeBox,
   } = useBoxes();
 
   // Edit states
@@ -168,10 +177,10 @@ export default function Inventory() {
 
       if (editItemId) {
         await updateItem(editItemId, itemData);
-        Alert.alert("Success", "Item updated");
+        showSnackbar("Item updated", "success");
       } else {
         await addItem(itemData);
-        Alert.alert("Success", "Item added");
+        showSnackbar("Item added", "success");
       }
 
       setNewItem({
@@ -188,11 +197,11 @@ export default function Inventory() {
       setShowAddForm(false);
       setEditItemId(null);
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to save item");
+      showSnackbar(error.message || "Failed to save item", "error");
     } finally {
       setIsAddingItem(false);
     }
-  }, [newItem, editItemId, updateItem, addItem]);
+  }, [newItem, editItemId, updateItem, addItem, showSnackbar]);
 
   const handleAddBoxSubmit = useCallback(async () => {
     try {
@@ -208,10 +217,10 @@ export default function Inventory() {
 
       if (editBoxId) {
         await updateBox(editBoxId, boxData);
-        Alert.alert("Success", "Box updated");
+        showSnackbar("Box updated", "success");
       } else {
         await addBox(boxData);
-        Alert.alert("Success", "Box added");
+        showSnackbar("Box added", "success");
       }
 
       setNewBox({
@@ -225,11 +234,11 @@ export default function Inventory() {
       setShowAddBoxForm(false);
       setEditBoxId(null);
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to save box");
+      showSnackbar(error.message || "Failed to save box", "error");
     } finally {
       setIsAddingBox(false);
     }
-  }, [newBox, editBoxId, updateBox, addBox]);
+  }, [newBox, editBoxId, updateBox, addBox, showSnackbar]);
 
   const handleEditItem = useCallback((item: Item) => {
     setEditItemId(item._id);
@@ -249,27 +258,9 @@ export default function Inventory() {
 
   const handleDeleteItem = useCallback(
     (item: Item) => {
-      Alert.alert(
-        "Delete Item",
-        `Remove ${item.productName} from inventory?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                await removeItem(item._id);
-                Alert.alert("Deleted", "Item removed from inventory");
-              } catch (error: any) {
-                Alert.alert("Error", error.message || "Failed to delete item");
-              }
-            },
-          },
-        ],
-      );
+      setPendingDelete({ kind: "item", item });
     },
-    [removeItem],
+    [],
   );
 
   const handleEditBox = useCallback((box: Box) => {
@@ -284,6 +275,27 @@ export default function Inventory() {
     });
     setShowAddBoxForm(true);
   }, []);
+
+  const handleDeleteBox = useCallback((box: Box) => {
+    setPendingDelete({ kind: "box", box });
+  }, []);
+
+  const confirmDeleteBox = useCallback(async () => {
+    if (!pendingDelete) return;
+
+    try {
+      if (pendingDelete.kind === "item") {
+        await removeItem(pendingDelete.item._id);
+        showSnackbar("Item removed from inventory", "success");
+      } else {
+        await removeBox(pendingDelete.box._id);
+        showSnackbar("Box removed from inventory", "success");
+      }
+      setPendingDelete(null);
+    } catch (error: any) {
+      showSnackbar(error.message || "Failed to delete inventory entry", "error");
+    }
+  }, [pendingDelete, removeItem, removeBox, showSnackbar]);
 
   return (
     <SafeAreaView className="flex-1 bg-navy-950">
@@ -355,7 +367,6 @@ export default function Inventory() {
             onRefresh={onRefresh}
             onItemPress={(item) => handleEditItem(item)}
             onDeletePress={(item) => handleDeleteItem(item)}
-            tabBarHeight={tabBarHeight}
             onAddPress={() => {
               setEditItemId(null);
               setNewItem({
@@ -380,7 +391,7 @@ export default function Inventory() {
             isLoading={isLoadingBoxes}
             onRefresh={onRefresh}
             onBoxPress={handleEditBox}
-            tabBarHeight={tabBarHeight}
+            onDeletePress={handleDeleteBox}
             onAddPress={() => {
               setEditBoxId(null);
               setNewBox({
@@ -396,6 +407,42 @@ export default function Inventory() {
           />
         </View>
       )}
+
+      <TouchableOpacity
+        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full border border-azure-400/40 bg-azure-500"
+        style={{ bottom: tabBarHeight + 16 }}
+        onPress={() => {
+          if (activeTab === "items") {
+            setEditItemId(null);
+            setNewItem({
+              productName: "",
+              quantity: "",
+              weight: "",
+              price: "",
+              length: "",
+              breadth: "",
+              height: "",
+              category: "",
+              brand: "",
+            });
+            setShowAddForm(true);
+            return;
+          }
+
+          setEditBoxId(null);
+          setNewBox({
+            box_name: "",
+            length: "",
+            breadth: "",
+            height: "",
+            quantity: "",
+            max_weight: "",
+          });
+          setShowAddBoxForm(true);
+        }}
+      >
+        <Ionicons name="add" size={30} color="#E5F2FF" />
+      </TouchableOpacity>
 
       <AddItemForm
         visible={showAddForm}
@@ -414,6 +461,35 @@ export default function Inventory() {
         setNewBox={setNewBox}
         isAdding={isAddingBox}
       />
+
+      <FormModal
+        visible={Boolean(pendingDelete)}
+        onClose={() => setPendingDelete(null)}
+        title={pendingDelete?.kind === "item" ? "Delete Item" : "Delete Box"}
+      >
+        <Text className="text-base text-azure-200">
+          {pendingDelete?.kind === "item"
+            ? `Remove ${pendingDelete.item.productName} from inventory?`
+            : `Remove ${pendingDelete?.box.box_name || "this box"} from inventory?`}
+        </Text>
+        <Text className="mt-3 text-sm text-azure-200">
+          This cannot be undone.
+        </Text>
+        <View className="mt-6 flex-row gap-3">
+          <TouchableOpacity
+            className="flex-1 rounded-xl border border-navy-800/30 bg-navy-950 py-4"
+            onPress={() => setPendingDelete(null)}
+          >
+            <Text className="text-center font-bold text-azure-50">Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="flex-1 rounded-xl border border-[#D58F3C]/50 bg-[#231815] py-4"
+            onPress={confirmDeleteBox}
+          >
+            <Text className="text-center font-bold text-white">Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </FormModal>
     </SafeAreaView>
   );
 }
