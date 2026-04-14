@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -14,7 +15,6 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
 } from "react-native";
 import {
@@ -28,45 +28,27 @@ export default function Home() {
   const { items, dailyData, dailySold } = useInventory();
   const { boxes } = useBoxes();
   const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
 
   // Memoize chart data to prevent unnecessary recalculations
   const addItemData = useMemo(
     () =>
-      Array.isArray(dailyData) && dailyData.length === 7
+      Array.isArray(dailyData)
         ? dailyData.map((d) => ({
-            label: d.day.slice(0, 3),
-            count: d.quantity,
+            label: (d.day || "-").slice(0, 3),
+            count: Number(d.quantity) || 0,
           }))
-        : [
-            { label: "Mon", count: 0 },
-            { label: "Tue", count: 0 },
-            { label: "Wed", count: 0 },
-            { label: "Thu", count: 0 },
-            { label: "Fri", count: 0 },
-            { label: "Sat", count: 0 },
-            { label: "Sun", count: 0 },
-          ],
+        : [],
     [dailyData],
   );
 
   const sellItemData = useMemo(
     () =>
-      Array.isArray(dailySold) && dailySold.length === 7
+      Array.isArray(dailySold)
         ? dailySold.map((d) => ({
-            label: d.day.slice(0, 3),
-            count: d.quantity,
+            label: (d.day || "-").slice(0, 3),
+            count: Number(d.quantity) || 0,
           }))
-        : [
-            { label: "Mon", count: 0 },
-            { label: "Tue", count: 0 },
-            { label: "Wed", count: 0 },
-            { label: "Thu", count: 0 },
-            { label: "Fri", count: 0 },
-            { label: "Sat", count: 0 },
-            { label: "Sun", count: 0 },
-          ],
+        : [],
     [dailySold],
   );
 
@@ -83,8 +65,9 @@ export default function Home() {
   );
 
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const screenWidth = Dimensions.get("window").width;
-  const chartWidth = screenWidth > 600 ? screenWidth - 96 : screenWidth - 48; // adapt for tablet vs mobile
+  const chartWidth = screenWidth > 600 ? screenWidth - 132 : screenWidth - 88;
 
   const formatChartData = useMemo(
     () => (data: any[]) => ({
@@ -98,22 +81,16 @@ export default function Home() {
   const chartConfig = useMemo(
     () => ({
       backgroundColor: "transparent",
-      backgroundGradientFrom: isDark ? "#1e293b" : "#ffffff", // slate-800 or white
-      backgroundGradientTo: isDark ? "#1e293b" : "#ffffff",
+      backgroundGradientFrom: "#001933",
+      backgroundGradientTo: "#001933",
       decimalPlaces: 0,
-      color: (opacity = 1) =>
-        isDark
-          ? `rgba(129, 140, 248, ${opacity})`
-          : `rgba(79, 70, 229, ${opacity})`, // indigo-400 or indigo-600
-      labelColor: (opacity = 1) =>
-        isDark
-          ? `rgba(248, 250, 252, ${opacity})`
-          : `rgba(15, 23, 42, ${opacity})`, // slate-50 or slate-900
+      color: (opacity = 1) => `rgba(0, 127, 255, ${opacity})`,
+      labelColor: (opacity = 1) => `rgba(153, 204, 255, ${opacity})`,
       style: {
         borderRadius: 24,
       },
       propsForBackgroundLines: {
-        stroke: isDark ? "#334155" : "#f1f5f9", // slate-700 or slate-100
+        stroke: "rgba(5, 65, 97, 0.35)",
         strokeWidth: 1,
         strokeDasharray: "4",
       },
@@ -122,10 +99,10 @@ export default function Home() {
         fontWeight: "600",
       },
       barPercentage: 0.5,
-      fillShadowGradient: isDark ? "#6366f1" : "#4f46e5", // indigo-500 or indigo-600
+      fillShadowGradient: "#007FFF",
       fillShadowGradientOpacity: 0.8,
     }),
-    [isDark],
+    [],
   );
 
   const chartStyle = {
@@ -133,9 +110,18 @@ export default function Home() {
     borderRadius: 24,
   };
 
+  const addMax = useMemo(
+    () => Math.max(0, ...addItemData.map((entry) => entry.count)),
+    [addItemData],
+  );
+  const soldMax = useMemo(
+    () => Math.max(0, ...sellItemData.map((entry) => entry.count)),
+    [sellItemData],
+  );
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-[#0f172a]">
-      <StatusBar style={isDark ? "light" : "dark"} translucent />
+    <SafeAreaView className="flex-1 bg-navy-950">
+      <StatusBar style="light" translucent />
 
       <KeyboardAvoidingView
         className="flex-1"
@@ -143,48 +129,48 @@ export default function Home() {
       >
         {/* Header Section */}
         <View
-          className="px-6 pb-6 pt-12 bg-indigo-600 dark:bg-[#1e293b] rounded-b-[40px] shadow-lg shadow-indigo-500/20 z-10"
+          className="z-10 rounded-b-[40px] border-b border-navy-800/30 bg-navy-900 px-6 pb-6 pt-12"
           style={{ paddingTop: Math.max(insets.top + 16, 48) }}
         >
           <View className="flex-row justify-between items-center mb-6">
             <View>
-              <Text className="text-indigo-100 dark:text-slate-400 text-sm font-medium tracking-wider uppercase mb-1">
+              <Text className="mb-1 text-sm font-medium uppercase tracking-wider text-azure-200">
                 Dashboard
               </Text>
-              <Text className="text-white text-3xl font-extrabold tracking-tight">
+              <Text className="text-3xl font-extrabold tracking-tight text-azure-50">
                 Hello, {user?.name?.split(" ")[0] || "User"}
               </Text>
             </View>
             <TouchableOpacity
-              className="w-12 h-12 bg-white/20 dark:bg-slate-800 rounded-full items-center justify-center backdrop-blur-md"
-              onPress={() => router.push("/profile")}
+              className="h-12 w-12 items-center justify-center rounded-full border border-navy-800/40 bg-navy-950"
+              onPress={() => router.push("/(tabs)/profile")}
             >
-              <Ionicons name="person" size={20} color="white" />
+              <Ionicons name="person" size={20} color="#99CCFF" />
             </TouchableOpacity>
           </View>
 
           {/* Quick Actions */}
           <View className="flex-row justify-between items-center space-x-4">
             <TouchableOpacity
-              className="flex-1 bg-white dark:bg-slate-800 p-4 rounded-3xl flex-row items-center justify-center shadow-lg shadow-black/5"
-              onPress={() => router.push("/quick-pack")}
+              className="flex-1 flex-row items-center justify-center rounded-3xl border border-navy-800/30 bg-navy-950 p-4"
+              onPress={() => router.push("/(tabs)/analysis")}
             >
-              <View className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-2xl mr-3">
-                <Package color={isDark ? "#818cf8" : "#4f46e5"} size={24} />
+              <View className="mr-3 rounded-2xl bg-azure-500/15 p-2">
+                <Package color="#007FFF" size={24} strokeWidth={1.5} />
               </View>
-              <Text className="text-slate-900 dark:text-white font-bold text-base">
+              <Text className="text-base font-bold text-azure-50">
                 Quick Pack
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="flex-1 bg-white dark:bg-slate-800 p-4 rounded-3xl flex-row items-center justify-center shadow-lg shadow-black/5"
+              className="flex-1 flex-row items-center justify-center rounded-3xl border border-navy-800/30 bg-navy-950 p-4"
               onPress={() => router.push("/(tabs)/gemini")}
             >
-              <View className="bg-violet-100 dark:bg-violet-900/50 p-2 rounded-2xl mr-3">
-                <BoxIcon color={isDark ? "#a78bfa" : "#7c3aed"} size={24} />
+              <View className="mr-3 rounded-2xl bg-azure-500/15 p-2">
+                <BoxIcon color="#007FFF" size={24} strokeWidth={1.5} />
               </View>
-              <Text className="text-slate-900 dark:text-white font-bold text-base">
+              <Text className="text-base font-bold text-azure-50">
                 Scan Item
               </Text>
             </TouchableOpacity>
@@ -196,74 +182,65 @@ export default function Home() {
           className="flex-1 px-6 -mt-6"
           contentContainerStyle={{
             paddingTop: 48,
-            paddingBottom: 100, // accommodate bottom tab
+            paddingBottom: tabBarHeight + 24,
           }}
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
             <ActivityIndicator
               size="large"
-              color={isDark ? "#818cf8" : "#4f46e5"}
+              color="#007FFF"
               className="mt-10"
             />
           ) : (
-            <View className="space-y-8">
+            <View className="space-y-6">
               {/* KPIs Section */}
               <View>
-                <Text className="text-slate-900 dark:text-white text-xl font-bold mb-4 tracking-tight">
+                <Text className="mb-4 text-xl font-bold tracking-tight text-azure-50">
                   Overview
                 </Text>
                 <View className="flex-row justify-between gap-x-3">
                   <TouchableOpacity
-                    className="flex-1 bg-white dark:bg-[#1e293b] p-4 rounded-[24px] items-center shadow-sm border border-slate-100 dark:border-slate-800"
-                    onPress={() => router.push("/inventory")}
+                    className="flex-1 items-center rounded-[24px] border border-navy-800/30 bg-navy-900 p-4"
+                    onPress={() => router.push("/(tabs)/inventory")}
                   >
-                    <View className="bg-blue-50 dark:bg-blue-900/20 w-12 h-12 rounded-full items-center justify-center mb-2">
-                      <Package
-                        color={isDark ? "#60a5fa" : "#2563eb"}
-                        size={24}
-                      />
+                    <View className="mb-2 h-12 w-12 items-center justify-center rounded-full bg-azure-500/15">
+                      <Package color="#007FFF" size={24} strokeWidth={1.5} />
                     </View>
-                    <Text className="text-slate-900 dark:text-white text-2xl font-extrabold mb-0.5">
+                    <Text className="mb-0.5 text-2xl font-extrabold text-azure-50">
                       {items.length}
                     </Text>
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                    <Text className="text-xs font-semibold text-azure-200">
                       Items
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    className="flex-1 bg-white dark:bg-[#1e293b] p-4 rounded-[24px] items-center shadow-sm border border-slate-100 dark:border-slate-800"
-                    onPress={() => router.push("/inventory")}
+                    className="flex-1 items-center rounded-[24px] border border-navy-800/30 bg-navy-900 p-4"
+                    onPress={() => router.push("/(tabs)/inventory")}
                   >
-                    <View className="bg-emerald-50 dark:bg-emerald-900/20 w-12 h-12 rounded-full items-center justify-center mb-2">
-                      <BoxIcon
-                        color={isDark ? "#34d399" : "#059669"}
-                        size={24}
-                      />
+                    <View className="mb-2 h-12 w-12 items-center justify-center rounded-full bg-azure-500/15">
+                      <BoxIcon color="#007FFF" size={24} strokeWidth={1.5} />
                     </View>
-                    <Text className="text-slate-900 dark:text-white text-2xl font-extrabold mb-0.5">
+                    <Text className="mb-0.5 text-2xl font-extrabold text-azure-50">
                       {boxes.length}
                     </Text>
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                    <Text className="text-xs font-semibold text-azure-200">
                       Boxes
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    className="flex-1 bg-white dark:bg-[#1e293b] p-4 rounded-[24px] items-center shadow-sm border border-slate-100 dark:border-slate-800"
-                    onPress={() => router.push("/analysis")}
+                    className="flex-1 items-center rounded-[24px] border border-navy-800/30 bg-navy-900 p-4"
+                    onPress={() => router.push("/(tabs)/analysis")}
                   >
-                    <View className="bg-amber-50 dark:bg-amber-900/20 w-12 h-12 rounded-full items-center justify-center mb-2">
-                      <TrendingUp
-                        color={isDark ? "#fbbf24" : "#d97706"}
-                        size={24}
-                      />
+                    <View className="mb-2 h-12 w-12 items-center justify-center rounded-full bg-[#00F6FF]/10">
+                      <TrendingUp color="#00F6FF" size={24} strokeWidth={1.5} />
                     </View>
-                    <Text className="text-slate-900 dark:text-white text-2xl font-extrabold mb-0.5">
+                    <Text className="mb-0.5 text-2xl font-extrabold text-azure-50">
                       {totalQuantity}
                     </Text>
-                    <Text className="text-slate-500 dark:text-slate-400 text-xs font-semibold text-center">
+                    <Text className="text-center text-xs font-semibold text-azure-200">
                       Units Stock
                     </Text>
                   </TouchableOpacity>
@@ -274,54 +251,67 @@ export default function Home() {
 
               {/* Add Item Graph */}
               <View>
-                <Text className="text-slate-900 dark:text-white text-xl font-bold mb-4 tracking-tight px-1">
+                <Text className="mb-4 px-1 text-xl font-bold tracking-tight text-azure-50">
                   Items Added
                 </Text>
-                <View className="bg-white dark:bg-[#1e293b] p-4 md:p-6 rounded-[32px] shadow-sm border border-slate-100 dark:border-slate-800 justify-center items-center overflow-hidden">
-                  <BarChart
-                    data={formatChartData(addItemData)}
-                    width={chartWidth}
-                    height={220}
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    fromZero={true}
-                    chartConfig={chartConfig}
-                    style={chartStyle}
-                    withInnerLines={false}
-                    showValuesOnTopOfBars={true}
-                    withHorizontalLabels={true}
-                    withVerticalLabels={true}
-                  />
+                <View
+                  className="items-center justify-center overflow-hidden rounded-card border border-navy-800/30 bg-navy-900 p-4"
+                  style={{ aspectRatio: 16 / 9 }}
+                >
+                  {addItemData.length > 0 ? (
+                    <BarChart
+                      data={formatChartData(addItemData)}
+                      width={chartWidth}
+                      height={190}
+                      yAxisLabel=""
+                      yAxisSuffix=""
+                      fromZero={true}
+                      segments={Math.max(4, Math.min(10, addMax || 4))}
+                      chartConfig={chartConfig}
+                      style={chartStyle}
+                      withInnerLines={false}
+                      showValuesOnTopOfBars={true}
+                      withHorizontalLabels={true}
+                      withVerticalLabels={true}
+                    />
+                  ) : (
+                    <Text className="text-azure-200">No add-item logs yet</Text>
+                  )}
                 </View>
               </View>
 
               {/* Sell Item Graph */}
               <View>
-                <Text className="text-slate-900 dark:text-white text-xl font-bold mb-4 tracking-tight px-1">
+                <Text className="mb-4 px-1 text-xl font-bold tracking-tight text-azure-50">
                   Items Sold
                 </Text>
-                <View className="bg-white dark:bg-[#1e293b] p-4 md:p-6 rounded-[32px] shadow-sm border border-slate-100 dark:border-slate-800 justify-center items-center overflow-hidden">
-                  <BarChart
-                    data={formatChartData(sellItemData)}
-                    width={chartWidth}
-                    height={220}
-                    yAxisLabel=""
-                    yAxisSuffix=""
-                    fromZero={true}
-                    chartConfig={{
-                      ...chartConfig,
-                      color: (opacity = 1) =>
-                        isDark
-                          ? `rgba(52, 211, 153, ${opacity})`
-                          : `rgba(5, 150, 105, ${opacity})`, // emerald-400 or emerald-600
-                      fillShadowGradient: isDark ? "#10b981" : "#059669",
-                    }}
-                    style={chartStyle}
-                    withInnerLines={false}
-                    showValuesOnTopOfBars={true}
-                    withHorizontalLabels={true}
-                    withVerticalLabels={true}
-                  />
+                <View
+                  className="items-center justify-center overflow-hidden rounded-card border border-navy-800/30 bg-navy-900 p-4"
+                  style={{ aspectRatio: 16 / 9 }}
+                >
+                  {sellItemData.length > 0 ? (
+                    <BarChart
+                      data={formatChartData(sellItemData)}
+                      width={chartWidth}
+                      height={190}
+                      yAxisLabel=""
+                      yAxisSuffix=""
+                      fromZero={true}
+                      segments={Math.max(4, Math.min(10, soldMax || 4))}
+                      chartConfig={{
+                        ...chartConfig,
+                        color: (opacity = 1) => `rgba(0, 246, 255, ${opacity})`,
+                        fillShadowGradient: "#00F6FF",
+                      }}
+                      style={chartStyle}
+                      withInnerLines={false}
+                      showValuesOnTopOfBars={true}
+                      withHorizontalLabels={true}
+                      withVerticalLabels={true}
+                    />
+                  ) : (
+                    <Text className="text-azure-200">No sold-item logs yet</Text>
+                  )}
                 </View>
               </View>
             </View>

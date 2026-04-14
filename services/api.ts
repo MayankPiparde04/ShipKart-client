@@ -217,6 +217,19 @@ export const apiService = {
     }
   },
 
+  packInventory: async (data: {
+    productId: string;
+    packedQty: number;
+    cartonsUsed: Array<any>;
+  }) => {
+    try {
+      const response = await api.post('/inventory/pack', data);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
   optimalPacking2: async (products: any) => {
     try {
       const response = await api.post('/optimal-packing2', { products });

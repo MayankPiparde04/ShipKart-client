@@ -1,11 +1,11 @@
 import PackingAnalysisResult from "@/components/analysis/PackingAnalysisResult";
+import SkeletonCard from "@/components/ui/SkeletonCard";
 import { useInventory } from "@/contexts/InventoryContext";
 import { useOptimal } from "@/contexts/OptimalContext";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -20,9 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Analysis() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
-  const { items, isLoading: isLoadingItems, removeBoxItem } = useInventory();
+  const { items, isLoading: isLoadingItems } = useInventory();
   const { loading, error, result, fetchOptimalPacking, clearResult } =
     useOptimal();
 
@@ -31,25 +29,22 @@ export default function Analysis() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [quantity, setQuantity] = useState<string>("1");
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Tab 1: Select Item
   const renderSelectItem = () => (
     <View style={{ flex: 1 }}>
-      <Text className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+      <Text className="mb-6 text-3xl font-bold text-azure-50">
         Choose Product
       </Text>
-      <Text className="text-gray-500 dark:text-gray-400 mb-4">
+      <Text className="mb-4 text-azure-200">
         Select an item to calculate optimal packing
       </Text>
       {isLoadingItems ? (
-        <View className="items-center py-8">
-          <ActivityIndicator
-            size="large"
-            color={isDark ? "#8b5cf6" : "#7c3aed"}
-          />
-          <Text className="text-gray-500 dark:text-gray-400 mt-4">
-            Loading items...
-          </Text>
+        <View className="py-2">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : (
         <FlatList
@@ -58,25 +53,25 @@ export default function Analysis() {
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
             <TouchableOpacity
-              className="bg-gray-100/40 dark:bg-gray-900 p-5 mb-4 rounded-3xl border border-gray-200 dark:border-gray-700 "
+              className="mb-4 rounded-3xl border border-navy-800/30 bg-navy-900 p-5"
               onPress={() => {
                 setSelectedItem(item);
                 setTab(1);
                 setQuantity("1");
               }}
             >
-              <Text className="text-gray-900 dark:text-gray-100 text-xl font-bold mb-2">
+              <Text className="mb-2 text-xl font-bold text-azure-50">
                 {item.productName}
               </Text>
               <View className="flex-row justify-between mb-2">
-                <Text className="text-gray-600 dark:text-gray-300 font-medium">
+                <Text className="font-medium text-azure-200">
                   Available: {item.quantity}
                 </Text>
-                <Text className="text-gray-600 dark:text-gray-300 font-medium">
+                <Text className="font-medium text-azure-200">
                   Weight: {item.weight}g
                 </Text>
               </View>
-              <Text className="text-gray-500 dark:text-gray-400">
+              <Text className="text-azure-200">
                 Size: {item.dimensions.length} × {item.dimensions.breadth} ×{" "}
                 {item.dimensions.height} cm
               </Text>
@@ -84,10 +79,10 @@ export default function Analysis() {
           )}
           ListEmptyComponent={
             <View className="items-center py-12">
-              <Text className="text-gray-500 dark:text-gray-400 text-lg text-center">
+              <Text className="text-center text-lg text-azure-200">
                 No items found
               </Text>
-              <Text className="text-gray-500 dark:text-gray-400 text-center mt-2">
+              <Text className="mt-2 text-center text-azure-200">
                 Add some products to get started
               </Text>
             </View>
@@ -107,40 +102,40 @@ export default function Analysis() {
         animationType="slide"
         onRequestClose={() => setQuantityModalVisible(false)}
       >
-        <View className="flex-1 justify-center bg-black/50 dark:bg-black/70">
+        <View className="flex-1 justify-center bg-[#001224]/75">
           <View
             style={{
-              backgroundColor: isDark ? "#1f2937" : "#ffffff",
+              backgroundColor: "#001933",
               padding: 32,
               borderRadius: 24,
               marginHorizontal: 16,
-              borderWidth: 2,
-              borderColor: isDark ? "#8b5cf6" : "#7c3aed",
-              elevation: 10,
+              borderWidth: 1,
+              borderColor: "rgba(5, 65, 97, 0.3)",
+              elevation: 6,
             }}
           >
-            <Text className="text-3xl font-bold text-green-600 dark:text-green-400 mb-6 text-center">
+            <Text className="mb-6 text-center text-3xl font-bold text-azure-50">
               Set Quantity
             </Text>
             <View className="mb-6">
-              <Text className="text-gray-900 dark:text-gray-100 text-lg mb-2">
+              <Text className="mb-2 text-lg text-azure-50">
                 Product: {selectedItem?.productName}
               </Text>
-              <Text className="text-gray-600 dark:text-gray-300 text-base">
+              <Text className="text-base text-azure-200">
                 Available:{" "}
-                <Text className="font-bold text-green-600 dark:text-green-400">
+                <Text className="font-bold text-[#00F6FF]">
                   {maxQty} units
                 </Text>
               </Text>
             </View>
             <TextInput
               style={{
-                backgroundColor: isDark ? "#374151" : "#f9fafb",
-                color: isDark ? "#f3f4f6" : "#111827",
-                borderColor: isDark ? "#6b7280" : "#d1d5db",
-                borderWidth: 2,
+                backgroundColor: "#001224",
+                color: "#E5F2FF",
+                borderColor: "rgba(5, 65, 97, 0.3)",
+                borderWidth: 1,
                 padding: 16,
-                borderRadius: 12,
+                borderRadius: 16,
                 marginBottom: 24,
                 textAlign: "center",
                 fontSize: 24,
@@ -149,35 +144,38 @@ export default function Analysis() {
               keyboardType="numeric"
               value={quantity}
               onChangeText={(val) => {
-                setQuantity(val.replace(/[^0-9]/g, ""));
+                setQuantity(val.replaceAll(/\D/g, ""));
               }}
               placeholder="Enter quantity"
-              placeholderTextColor={isDark ? "#9ca3af" : "#6b7280"}
+              placeholderTextColor="#99CCFF"
+              selectionColor="#3399FF"
             />
             <View className="flex-row space-x-4 gap-2">
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  backgroundColor: isDark ? "#6b7280" : "#e5e7eb",
+                  backgroundColor: "#001224",
                   paddingVertical: 16,
-                  borderRadius: 12,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "rgba(5, 65, 97, 0.3)",
                 }}
                 onPress={() => setQuantityModalVisible(false)}
               >
-                <Text className="text-gray-900 dark:text-gray-100 font-bold text-center text-lg">
+                <Text className="text-center text-lg font-bold text-azure-50">
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  backgroundColor: "#16a34a",
+                  backgroundColor: "#007FFF",
                   paddingVertical: 16,
-                  borderRadius: 12,
+                  borderRadius: 16,
                 }}
                 onPress={async () => {
-                  const num = parseInt(quantity, 10);
-                  if (!quantity || isNaN(num) || num < 1 || num > maxQty) {
+                  const num = Number.parseInt(quantity, 10);
+                  if (!quantity || Number.isNaN(num) || num < 1 || num > maxQty) {
                     Alert.alert(
                       "Invalid Quantity",
                       `Please enter a quantity between 1 and ${maxQty}.`,
@@ -210,13 +208,15 @@ export default function Analysis() {
         style={{
           flexDirection: "row",
           marginBottom: 16,
-          backgroundColor: isDark ? "#374151" : "#e5e7eb",
+          backgroundColor: "#001933",
           borderRadius: 16,
           padding: 4,
+          borderWidth: 1,
+          borderColor: "rgba(5, 65, 97, 0.3)",
         }}
       >
         <Pressable
-          className={`flex-1 py-3 rounded-xl ${tab === 0 ? (isDark ? "bg-gray-700" : "bg-white") : "transparent"}`}
+          className={`flex-1 py-3 rounded-xl ${tab === 0 ? "bg-azure-500/20" : "transparent"}`}
           onPress={() => {
             clearResult();
             setTab(0);
@@ -225,13 +225,13 @@ export default function Analysis() {
           }}
         >
           <Text
-            className={`text-center font-bold text-sm ${tab === 0 ? (isDark ? "text-white" : "text-primary-700") : isDark ? "text-gray-400" : "text-gray-500"}`}
+            className={`text-center text-sm font-bold ${tab === 0 ? "text-azure-50" : "text-azure-200"}`}
           >
             Select Item
           </Text>
         </Pressable>
         <Pressable
-          className={`flex-1 py-3 rounded-xl ${tab === 1 ? (isDark ? "bg-gray-700" : "bg-white") : "transparent"}`}
+          className={`flex-1 py-3 rounded-xl ${tab === 1 ? "bg-azure-500/20" : "transparent"}`}
           onPress={() => {
             if (selectedItem) {
               if (tab === 2) {
@@ -243,13 +243,13 @@ export default function Analysis() {
           disabled={!selectedItem}
         >
           <Text
-            className={`text-center font-bold text-sm ${tab === 1 ? (isDark ? "text-white" : "text-primary-700") : isDark ? "text-gray-400" : "text-gray-500"}`}
+            className={`text-center text-sm font-bold ${tab === 1 ? "text-azure-50" : "text-azure-200"}`}
           >
             Quantity
           </Text>
         </Pressable>
         <Pressable
-          className={`flex-1 py-3 rounded-xl ${tab === 2 ? (isDark ? "bg-gray-700" : "bg-white") : "transparent"}`}
+          className={`flex-1 py-3 rounded-xl ${tab === 2 ? "bg-azure-500/20" : "transparent"}`}
           onPress={() => {
             if (result) {
               setTab(2);
@@ -258,7 +258,7 @@ export default function Analysis() {
           disabled={!result}
         >
           <Text
-            className={`text-center font-bold text-sm ${tab === 2 ? (isDark ? "text-white" : "text-primary-700") : isDark ? "text-gray-400" : "text-gray-500"}`}
+            className={`text-center text-sm font-bold ${tab === 2 ? "text-azure-50" : "text-azure-200"}`}
           >
             Results
           </Text>
@@ -268,38 +268,38 @@ export default function Analysis() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white/40 dark:bg-gray-950 pb-4">
-      <StatusBar style="auto" translucent={true} />
+    <SafeAreaView className="flex-1 bg-navy-950">
+      <StatusBar style="light" translucent={true} />
       <KeyboardAvoidingView
         className="flex-1 "
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <View className="px-6 py-2 flex-1 mb-20">
+        <View className="flex-1 px-6 py-4" style={{ paddingBottom: tabBarHeight + 12 }}>
           <View className="mb-6">
-            <Text className="text-4xl font-bold text-gray-900 dark:text-gray-100 text-center">
+            <Text className="text-center text-4xl font-bold text-azure-50">
               Packing Analysis
             </Text>
-            <Text className="text-gray-500 dark:text-gray-400 text-center mt-2">
+            <Text className="mt-2 text-center text-azure-200">
               Optimize your shipping costs
             </Text>
           </View>
           {renderTabs()}
           {tab === 0 && renderSelectItem()}
           {tab === 1 && selectedItem && (
-            <View className="flex-1 ">
-              <View className="bg-gray-100/40 dark:bg-gray-900 p-4 rounded-2xl border border-gray-400 dark:border-gray-400 mb-6">
-                <Text className="text-gray-500 dark:text-gray-400 text-sm mb-2">
+            <View className="flex-1">
+              <View className="mb-6 rounded-card border border-navy-800/30 bg-navy-900 p-4">
+                <Text className="mb-2 text-sm text-azure-200">
                   Selected Product
                 </Text>
-                <Text className="text-gray-900 dark:text-gray-100 text-2xl font-bold mb-2">
+                <Text className="mb-2 text-2xl font-bold text-azure-50">
                   {selectedItem.productName}
                 </Text>
-                <Text className="text-gray-600 dark:text-gray-300">
+                <Text className="text-azure-200">
                   Available: {selectedItem.quantity} units
                 </Text>
                 <TouchableOpacity
-                  className="mt-4 py-2 px-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg self-start"
+                  className="mt-4 self-start rounded-lg border border-azure-400/35 bg-azure-500/15 px-2 py-2"
                   onPress={() => {
                     setTab(0);
                     clearResult();
@@ -307,13 +307,13 @@ export default function Analysis() {
                     setQuantity("1");
                   }}
                 >
-                  <Text className="text-primary-700 dark:text-primary-300 text-sm font-medium">
+                  <Text className="text-sm font-medium text-azure-50">
                     Change Product
                   </Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
-                className="bg-green-600 py-4 rounded-2xl"
+                className="rounded-2xl border border-azure-400/40 bg-azure-500 py-4"
                 onPress={() => setQuantityModalVisible(true)}
               >
                 <Text className="text-white font-bold text-center text-xl">
@@ -333,8 +333,6 @@ export default function Analysis() {
               setTab={setTab}
               setSelectedItem={setSelectedItem}
               setQuantity={setQuantity}
-              removeBoxItem={removeBoxItem}
-              isDark={isDark}
             />
           )}
         </View>

@@ -4,6 +4,7 @@ import BoxList from "@/components/inventory/BoxList";
 import InventoryList from "@/components/inventory/InventoryList";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -75,6 +76,7 @@ export default function Inventory() {
     isLoading: isLoadingItems,
     addItem,
     updateItem,
+    removeItem,
   } = useInventory();
 
   const {
@@ -90,6 +92,7 @@ export default function Inventory() {
   const [editBoxId, setEditBoxId] = useState<string | null>(null);
 
   const params = useLocalSearchParams();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Pre-fill form
   React.useEffect(() => {
@@ -114,7 +117,7 @@ export default function Inventory() {
             ? String(prediction.dimensions.height)
             : "",
           category: prediction.category || "",
-          brand: prediction.brand !== "Unknown" ? (prediction.brand || "") : "",
+          brand: prediction.brand === "Unknown" ? "" : (prediction.brand || ""),
         });
       } catch {
         // ignore
@@ -151,13 +154,13 @@ export default function Inventory() {
       setIsAddingItem(true);
       const itemData = {
         productName: newItem.productName,
-        quantity: parseInt(newItem.quantity),
-        weight: parseFloat(newItem.weight),
-        price: parseFloat(newItem.price),
+        quantity: Number.parseInt(newItem.quantity, 10),
+        weight: Number.parseFloat(newItem.weight),
+        price: Number.parseFloat(newItem.price),
         dimensions: {
-          length: parseFloat(newItem.length),
-          breadth: parseFloat(newItem.breadth),
-          height: parseFloat(newItem.height),
+          length: Number.parseFloat(newItem.length),
+          breadth: Number.parseFloat(newItem.breadth),
+          height: Number.parseFloat(newItem.height),
         },
         category: newItem.category,
         brand: newItem.brand,
@@ -196,11 +199,11 @@ export default function Inventory() {
       setIsAddingBox(true);
       const boxData = {
         box_name: newBox.box_name,
-        length: parseFloat(newBox.length),
-        breadth: parseFloat(newBox.breadth),
-        height: parseFloat(newBox.height),
-        quantity: parseInt(newBox.quantity),
-        max_weight: parseFloat(newBox.max_weight),
+        length: Number.parseFloat(newBox.length),
+        breadth: Number.parseFloat(newBox.breadth),
+        height: Number.parseFloat(newBox.height),
+        quantity: Number.parseInt(newBox.quantity, 10),
+        max_weight: Number.parseFloat(newBox.max_weight),
       };
 
       if (editBoxId) {
@@ -244,6 +247,31 @@ export default function Inventory() {
     setShowAddForm(true);
   }, []);
 
+  const handleDeleteItem = useCallback(
+    (item: Item) => {
+      Alert.alert(
+        "Delete Item",
+        `Remove ${item.productName} from inventory?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await removeItem(item._id);
+                Alert.alert("Deleted", "Item removed from inventory");
+              } catch (error: any) {
+                Alert.alert("Error", error.message || "Failed to delete item");
+              }
+            },
+          },
+        ],
+      );
+    },
+    [removeItem],
+  );
+
   const handleEditBox = useCallback((box: Box) => {
     setEditBoxId(box._id);
     setNewBox({
@@ -258,10 +286,10 @@ export default function Inventory() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-950">
-      <StatusBar style="auto" />
-      <View className="px-4 py-2 border-b border-gray-200 dark:border-gray-800">
-        <Text className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+    <SafeAreaView className="flex-1 bg-navy-950">
+      <StatusBar style="light" />
+      <View className="border-b border-navy-800/30 px-4 py-2">
+        <Text className="mb-4 text-2xl font-bold text-azure-50">
           Inventory
         </Text>
         <View className="flex-row mb-4">
@@ -269,15 +297,15 @@ export default function Inventory() {
             onPress={() => setActiveTab("items")}
             className={`flex-1 py-3 border-b-2 ${
               activeTab === "items"
-                ? "border-primary-600 dark:border-primary-400"
+                ? "border-azure-500"
                 : "border-transparent"
             }`}
           >
             <Text
               className={`text-center font-bold ${
                 activeTab === "items"
-                  ? "text-primary-600 dark:text-primary-400"
-                  : "text-gray-500"
+                  ? "text-azure-500"
+                  : "text-azure-200"
               }`}
             >
               Items
@@ -287,15 +315,15 @@ export default function Inventory() {
             onPress={() => setActiveTab("boxes")}
             className={`flex-1 py-3 border-b-2 ${
               activeTab === "boxes"
-                ? "border-secondary-600 dark:border-secondary-400"
+                ? "border-azure-400"
                 : "border-transparent"
             }`}
           >
             <Text
               className={`text-center font-bold ${
                 activeTab === "boxes"
-                  ? "text-secondary-600 dark:text-secondary-400"
-                  : "text-gray-500"
+                  ? "text-azure-400"
+                  : "text-azure-200"
               }`}
             >
               Boxes
@@ -303,14 +331,15 @@ export default function Inventory() {
           </TouchableOpacity>
         </View>
 
-        <View className="bg-gray-200 dark:bg-gray-900 rounded-xl flex-row items-center px-4 py-2 mb-2">
+        <View className="mb-2 flex-row items-center rounded-xl border border-navy-800/30 bg-navy-900 px-4 py-2">
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
             placeholder={
               activeTab === "items" ? "Search items..." : "Search boxes..."
             }
             placeholderTextColor="#9CA3AF"
-            className="flex-1 ml-2 text-gray-900 dark:text-white"
+            className="ml-2 flex-1 text-azure-50"
+            selectionColor="#3399FF"
             value={searchText}
             onChangeText={setSearchText}
           />
@@ -318,47 +347,54 @@ export default function Inventory() {
       </View>
 
       {activeTab === "items" ? (
-        <InventoryList
-          items={filteredItems}
-          isLoading={isLoadingItems}
-          isRefreshing={isRefreshing}
-          onRefresh={onRefresh}
-          onItemPress={(item) => handleEditItem(item)}
-          onAddPress={() => {
-            setEditItemId(null);
-            setNewItem({
-              productName: "",
-              quantity: "",
-              weight: "",
-              price: "",
-              length: "",
-              breadth: "",
-              height: "",
-              category: "",
-              brand: "",
-            });
-            setShowAddForm(true);
-          }}
-        />
+        <View className="flex-1" style={{ paddingBottom: tabBarHeight }}>
+          <InventoryList
+            items={filteredItems}
+            isLoading={isLoadingItems}
+            isRefreshing={isRefreshing}
+            onRefresh={onRefresh}
+            onItemPress={(item) => handleEditItem(item)}
+            onDeletePress={(item) => handleDeleteItem(item)}
+            tabBarHeight={tabBarHeight}
+            onAddPress={() => {
+              setEditItemId(null);
+              setNewItem({
+                productName: "",
+                quantity: "",
+                weight: "",
+                price: "",
+                length: "",
+                breadth: "",
+                height: "",
+                category: "",
+                brand: "",
+              });
+              setShowAddForm(true);
+            }}
+          />
+        </View>
       ) : (
-        <BoxList
-          boxes={filteredBoxes}
-          isLoading={isLoadingBoxes}
-          onRefresh={onRefresh}
-          onBoxPress={(box) => handleEditBox(box)}
-          onAddPress={() => {
-            setEditBoxId(null);
-            setNewBox({
-              box_name: "",
-              length: "",
-              breadth: "",
-              height: "",
-              quantity: "",
-              max_weight: "",
-            });
-            setShowAddBoxForm(true);
-          }}
-        />
+        <View className="flex-1" style={{ paddingBottom: tabBarHeight }}>
+          <BoxList
+            boxes={filteredBoxes}
+            isLoading={isLoadingBoxes}
+            onRefresh={onRefresh}
+            onBoxPress={handleEditBox}
+            tabBarHeight={tabBarHeight}
+            onAddPress={() => {
+              setEditBoxId(null);
+              setNewBox({
+                box_name: "",
+                length: "",
+                breadth: "",
+                height: "",
+                quantity: "",
+                max_weight: "",
+              });
+              setShowAddBoxForm(true);
+            }}
+          />
+        </View>
       )}
 
       <AddItemForm

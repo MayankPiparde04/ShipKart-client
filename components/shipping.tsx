@@ -3,12 +3,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ShippingScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-gray-900">
+    <SafeAreaView className="flex-1 bg-navy-950">
       <View className="flex-1 p-6">
-        <Text className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+        <Text className="mb-4 text-2xl font-bold text-azure-50">
           Shipping Calculator
         </Text>
-        <Text className="text-gray-600 dark:text-gray-300">
+        <Text className="text-azure-200/80">
           Calculate optimal shipping solutions
         </Text>
       </View>

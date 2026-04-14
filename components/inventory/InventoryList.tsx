@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { memo } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Box, PackagePlus, Trash2 } from "lucide-react-native";
+import SkeletonCard from "../ui/SkeletonCard";
 
 interface Item {
   _id: string;
@@ -26,8 +27,60 @@ interface InventoryListProps {
   isRefreshing: boolean;
   onRefresh: () => void;
   onItemPress: (item: Item) => void;
+  onDeletePress: (item: Item) => void;
   onAddPress: () => void;
+  tabBarHeight?: number;
 }
+
+const InventoryListItem = memo(function InventoryListItem({
+  item,
+  onPress,
+  onDelete,
+}: {
+  item: Item;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <View className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 p-4">
+      <View className="flex-row items-start justify-between">
+        <TouchableOpacity className="flex-1" onPress={onPress}>
+          <Text className="mb-1 text-lg font-bold text-azure-50">
+            {item.productName}
+          </Text>
+          <Text className="mb-2 text-sm text-azure-200">
+            {item.brand ? `${item.brand} • ` : ""}
+            {item.category || "Uncategorized"}
+          </Text>
+          <View className="flex-row gap-2">
+            <View className="rounded border border-navy-800/30 bg-navy-950 px-2 py-1">
+              <Text className="text-xs text-azure-200">
+                {item.dimensions.length}x{item.dimensions.breadth}x
+                {item.dimensions.height} cm
+              </Text>
+            </View>
+            <View className="rounded border border-navy-800/30 bg-navy-950 px-2 py-1">
+              <Text className="text-xs text-azure-200">{item.weight}g</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+        <View className="items-end">
+          <Text className="text-2xl font-bold text-azure-50">{item.quantity}</Text>
+          <Text className="text-xs text-azure-200">units</Text>
+          <Text className="mt-2 text-sm font-medium text-[#00F6FF]">₹{item.price}</Text>
+          <TouchableOpacity
+            className="mt-2 h-11 w-11 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15"
+            onPress={onDelete}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.productName}`}
+          >
+            <Trash2 size={20} strokeWidth={1.5} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+});
 
 export default function InventoryList({
   items,
@@ -35,13 +88,16 @@ export default function InventoryList({
   isRefreshing,
   onRefresh,
   onItemPress,
+  onDeletePress,
   onAddPress,
-}: InventoryListProps) {
+  tabBarHeight = 0,
+}: Readonly<InventoryListProps>) {
   if (isLoading) {
     return (
-      <View className="flex-1 justify-center items-center">
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text className="text-gray-500 mt-4">Loading inventory...</Text>
+      <View className="flex-1 px-4 pt-4">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
       </View>
     );
   }
@@ -54,56 +110,29 @@ export default function InventoryList({
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={60}
+        windowSize={7}
+        removeClippedSubviews
         contentContainerStyle={{ padding: 16 }}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            className="bg-white dark:bg-gray-800 p-4 rounded-xl mb-3 shadow-sm border border-gray-100 dark:border-gray-700"
+          <InventoryListItem
+            item={item}
             onPress={() => onItemPress(item)}
-          >
-            <View className="flex-row justify-between items-start">
-              <View className="flex-1">
-                <Text className="font-bold text-gray-900 dark:text-white text-lg mb-1">
-                  {item.productName}
-                </Text>
-                <Text className="text-gray-500 dark:text-gray-400 text-sm mb-2">
-                  {item.brand ? `${item.brand} • ` : ""}
-                  {item.category || "Uncategorized"}
-                </Text>
-                <View className="flex-row gap-2">
-                  <View className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    <Text className="text-xs text-gray-600 dark:text-gray-300">
-                      {item.dimensions.length}x{item.dimensions.breadth}x
-                      {item.dimensions.height} cm
-                    </Text>
-                  </View>
-                  <View className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                    <Text className="text-xs text-gray-600 dark:text-gray-300">
-                      {item.weight}g
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View className="items-end">
-                <Text className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {item.quantity}
-                </Text>
-                <Text className="text-xs text-gray-400">units</Text>
-                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2">
-                  ${item.price}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+            onDelete={() => onDeletePress(item)}
+          />
         )}
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
-            <Ionicons name="cube-outline" size={64} color="#9CA3AF" />
-            <Text className="text-gray-500 mt-4 text-lg">No items found</Text>
+            <Box size={64} strokeWidth={1.5} color="#99CCFF" />
+            <Text className="mt-4 text-lg text-azure-200">No items found</Text>
             <TouchableOpacity
               onPress={onAddPress}
-              className="mt-4 bg-blue-100 dark:bg-blue-900/30 px-6 py-2 rounded-full"
+              className="mt-4 flex-row items-center rounded-full border border-azure-400/40 bg-azure-500 px-6 py-2"
             >
-              <Text className="text-blue-600 dark:text-blue-400 font-bold">
+              <PackagePlus size={16} strokeWidth={1.5} color="#E5F2FF" />
+              <Text className="ml-2 font-bold text-azure-50">
                 Add First Item
               </Text>
             </TouchableOpacity>
@@ -111,10 +140,11 @@ export default function InventoryList({
         }
       />
       <TouchableOpacity
-        className="absolute bottom-6 right-6 bg-blue-600 w-14 h-14 rounded-full justify-center items-center shadow-lg"
+        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full border border-azure-400/40 bg-azure-500"
+        style={{ bottom: tabBarHeight + 16 }}
         onPress={onAddPress}
       >
-        <Ionicons name="add" size={30} color="white" />
+        <Ionicons name="add" size={30} color="#E5F2FF" />
       </TouchableOpacity>
     </View>
   );

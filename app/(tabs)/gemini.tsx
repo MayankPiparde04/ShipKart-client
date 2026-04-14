@@ -1,12 +1,11 @@
-import { useColorScheme } from "@/hooks/useColorScheme";
-
 import { useInventory } from "@/contexts/InventoryContext";
+import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useIsFocused } from "@react-navigation/native";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,12 +19,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
 export default function App() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { showSnackbar } = useSnackbar();
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
   const [isCameraReady, setCameraReady] = useState(false);
+  const [cameraTimedOut, setCameraTimedOut] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   const [viewMode, setViewMode] = useState<"capture" | "review">("capture");
@@ -34,40 +33,54 @@ export default function App() {
   );
   const router = useRouter();
   const { predictItemDimensions } = useInventory();
+  const isFocused = useIsFocused();
   const [isPredicting, setIsPredicting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Reset camera state when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    if (!isFocused) {
       setCameraReady(false);
-    }, []),
-  );
+      setCameraTimedOut(false);
+    }
+  }, [isFocused]);
+
+  useEffect(() => {
+    if (viewMode !== "capture" || !isFocused || !permission?.granted || isCameraReady) {
+      return;
+    }
+
+    setCameraTimedOut(false);
+    const timer = setTimeout(() => {
+      setCameraTimedOut(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [viewMode, isFocused, permission?.granted, isCameraReady]);
 
   if (!permission) {
-    return <View className="flex-1 bg-black" />;
+    return <View className="flex-1 bg-navy-950" />;
   }
 
   if (!permission.granted) {
     return (
-      <SafeAreaView className="flex-1 bg-white dark:bg-slate-900 justify-center items-center p-6">
+      <SafeAreaView className="flex-1 items-center justify-center bg-navy-950 p-6">
         <View className="items-center mb-8">
           <Ionicons
             name="camera-outline"
             size={80}
-            color={isDark ? "#818cf8" : "#4f46e5"}
+            color="#007FFF"
             className="mb-4"
           />
-          <Text className="text-slate-900 dark:text-white text-2xl font-bold mb-2 text-center">
+          <Text className="mb-2 text-center text-2xl font-bold text-azure-50">
             Camera Access Needed
           </Text>
-          <Text className="text-slate-500 dark:text-slate-400 text-center text-base">
+          <Text className="text-center text-base text-azure-200">
             ShipWise needs camera access to automatically measure the dimensions
             of your items.
           </Text>
         </View>
         <TouchableOpacity
-          className="bg-indigo-600 dark:bg-indigo-500 py-4 px-8 rounded-full shadow-lg shadow-indigo-500/30 active:bg-indigo-700"
+          className="rounded-full border border-azure-400/40 bg-azure-500 px-8 py-4 active:bg-azure-400"
           onPress={requestPermission}
         >
           <Text className="text-white font-bold text-lg tracking-wide">
@@ -83,10 +96,8 @@ export default function App() {
   }
 
   const onCameraReady = () => {
-    // Delay state update to avoid Reanimated crashing during rapid mount layout shifts
-    setTimeout(() => {
-      setCameraReady(true);
-    }, 50);
+    setCameraReady(true);
+    setCameraTimedOut(false);
   };
 
   const onCameraError = (error: any) => {
@@ -95,18 +106,14 @@ export default function App() {
   };
 
   const captureWithBackup = async () => {
-    try {
-      if (cameraRef.current && isCameraReady) {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.5,
-          skipProcessing: true,
-        });
-        return photo;
-      }
-      throw new Error("Camera not ready");
-    } catch (error) {
-      throw error;
+    if (cameraRef.current && isCameraReady) {
+      return cameraRef.current.takePictureAsync({
+        quality: 0.5,
+        skipProcessing: true,
+      });
     }
+
+    throw new Error("Camera not ready");
   };
 
   const takePicture = async () => {
@@ -188,6 +195,7 @@ export default function App() {
         setIsPredicting(false);
 
         if (prediction?.success && prediction?.data?.prediction) {
+          showSnackbar("Item Scanned Successfully", "success");
           router.replace({
             pathname: "/(tabs)/inventory",
             params: { prefill: JSON.stringify(prediction.data.prediction) },
@@ -197,6 +205,7 @@ export default function App() {
           setViewMode("capture");
           setCameraReady(false);
         } else {
+          showSnackbar("Scan Failed - Try Again", "error");
           Alert.alert(
             "Analysis Failed",
             prediction?.message ||
@@ -216,6 +225,7 @@ export default function App() {
            return;
         }
 
+        showSnackbar("Scan Failed - Try Again", "error");
         Alert.alert(
           "AI Analysis Error",
           error?.message ||
@@ -251,6 +261,7 @@ export default function App() {
 
   const backToCapture = () => {
     setViewMode("capture");
+    setCameraReady(false);
   };
 
   const terminateAnalysis = () => {
@@ -261,27 +272,27 @@ export default function App() {
   };
 
   return (
-    <View className="flex-1 bg-black">
+    <View className="flex-1 bg-navy-950">
       <StatusBar translucent backgroundColor="transparent" style="light" />
 
       {isPredicting && (
-        <View className="absolute z-50 inset-0 justify-center items-center bg-black/80 backdrop-blur-sm">
-          <View className="bg-slate-900/90 p-8 rounded-[32px] items-center border border-slate-700 w-3/4 relative">
+        <View className="absolute inset-0 z-50 items-center justify-center bg-[#001224]/85">
+          <View className="relative w-3/4 items-center rounded-[32px] border border-navy-800/30 bg-navy-900 p-8">
             <TouchableOpacity 
-              className="absolute top-4 right-4 z-50 p-2 bg-slate-800 rounded-full"
+              className="absolute right-4 top-4 z-50 rounded-full bg-navy-950 p-2"
               onPress={terminateAnalysis}
             >
-              <Ionicons name="close" size={24} color="#94a3b8" />
+              <Ionicons name="close" size={24} color="#99CCFF" />
             </TouchableOpacity>
             <ActivityIndicator
               size="large"
-              color="#818cf8"
+              color="#007FFF"
               className="mb-6 transform scale-150"
             />
-            <Text className="text-white text-xl font-bold mb-2 text-center">
+            <Text className="mb-2 text-center text-xl font-bold text-azure-50">
               Analyzing Item...
             </Text>
-            <Text className="text-slate-400 text-center text-sm">
+            <Text className="text-center text-sm text-azure-200">
               Our AI is currently measuring the dimensions, price, and brand of your item.
             </Text>
           </View>
@@ -299,23 +310,42 @@ export default function App() {
               <View className="absolute inset-0 z-10 flex items-center justify-center ">
                 <ActivityIndicator
                   size="large"
-                  color="#ffffff"
+                  color="#007FFF"
                   className="mb-4"
                 />
-                <Text className="text-white font-medium">
-                  Initializing scanner...
+                <Text className="font-medium text-azure-50">
+                  {cameraTimedOut
+                    ? "Scanner is taking longer than expected"
+                    : "Initializing scanner..."}
                 </Text>
+                {cameraTimedOut && (
+                  <TouchableOpacity
+                    className="mt-4 rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
+                    onPress={() => {
+                      setCameraReady(false);
+                      setCameraTimedOut(false);
+                    }}
+                  >
+                    <Text className="text-sm font-semibold text-white">Retry</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
-            <CameraView
-              ref={cameraRef}
-              className="flex-1"
-              style={{ width: "100%", height: "100%" }}
-              facing={facing}
-              onCameraReady={onCameraReady}
-              onMountError={onCameraError}
-            />
+            {isFocused ? (
+              <CameraView
+                ref={cameraRef}
+                className="flex-1"
+                style={{ width: "100%", height: "100%" }}
+                facing={facing}
+                onCameraReady={onCameraReady}
+                onMountError={onCameraError}
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center bg-navy-900">
+                <Text className="text-azure-200">Camera paused</Text>
+              </View>
+            )}
 
             {/* Viewfinder Overlay */}
             <View className="absolute inset-0 z-10 flex-1 justify-center items-center p-8 pointer-events-none">
@@ -341,7 +371,7 @@ export default function App() {
                 />
                 <View className="absolute top-16 left-6 z-10">
                   <TouchableOpacity
-                    className="w-12 h-12 rounded-full items-center justify-center backdrop-blur-md"
+                    className="h-12 w-12 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
                     onPress={backToCapture}
                   >
                     <Ionicons name="close" size={24} color="white" />
@@ -350,11 +380,11 @@ export default function App() {
               </>
             ) : (
               <View className="flex-1 justify-center items-center">
-                <Text className="text-slate-400 text-lg mb-6">
+                <Text className="mb-6 text-lg text-azure-200">
                   No image available
                 </Text>
                 <TouchableOpacity
-                  className="bg-indigo-600 px-8 py-4 rounded-full shadow-lg"
+                  className="rounded-full border border-azure-400/40 bg-azure-500 px-8 py-4"
                   onPress={backToCapture}
                 >
                   <Text className="text-white font-bold text-base">
@@ -368,7 +398,7 @@ export default function App() {
       </View>
 
       {/* Controls Area */}
-      <View className="h-[22%] bg-black justify-center pb-6">
+      <View className="h-[22%] justify-center bg-navy-950 pb-6">
         {viewMode === "capture" ? (
           <View className="flex-1 justify-center">
             {/* Captured Images Preview Strip */}
@@ -377,12 +407,12 @@ export default function App() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {capturedImages.map((image, index) => (
                     <TouchableOpacity
-                      key={index}
+                      key={image}
                       onPress={() => {
                         setCurrentImageIndex(index);
                         setViewMode("review");
                       }}
-                      className={`mr-3 rounded-2xl overflow-hidden border-2 ${currentImageIndex === index ? "border-indigo-500" : "border-slate-800"}`}
+                      className={`mr-3 overflow-hidden rounded-2xl border-2 ${currentImageIndex === index ? "border-azure-500" : "border-navy-800/40"}`}
                     >
                       <Image
                         source={{ uri: image }}
@@ -398,7 +428,7 @@ export default function App() {
             {/* Main Controls */}
             <View className="flex-row justify-between items-center px-10">
               <TouchableOpacity
-                className="w-14 h-14 bg-slate-800 rounded-full justify-center items-center"
+                className="h-14 w-14 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
                 onPress={pickImage}
               >
                 <Ionicons name="images" size={24} color="white" />
@@ -406,19 +436,19 @@ export default function App() {
 
               <TouchableOpacity
                 style={{ width: 96, height: 96 }}
-                className="rounded-full border-4 border-red-500 justify-center items-center"
+                className="items-center justify-center rounded-full border-4 border-azure-400"
                 onPress={takePicture}
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 activeOpacity={0.7}
               >
                 <View
                   style={{ width: 76, height: 76 }}
-                  className="bg-white rounded-full"
+                  className="rounded-full bg-azure-500"
                 />
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="w-14 h-14 bg-slate-800 rounded-full justify-center items-center"
+                className="h-14 w-14 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
                 onPress={toggleCameraFacing}
               >
                 <Ionicons name="camera-reverse" size={24} color="white" />
@@ -428,14 +458,14 @@ export default function App() {
         ) : (
           <View className="flex-1 flex-row justify-center items-center space-x-12">
             <TouchableOpacity
-              className="w-20 h-20 rounded-full bg-rose-500 justify-center items-center shadow-lg shadow-rose-500/30"
+              className="h-20 w-20 items-center justify-center rounded-full border border-navy-800/30 bg-navy-900"
               onPress={rejectImage}
             >
-              <Ionicons name="trash" size={32} color="white" />
+              <Ionicons name="trash" size={32} color="#99CCFF" />
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="w-20 h-20 rounded-full bg-emerald-500 justify-center items-center shadow-lg shadow-emerald-500/30"
+              className="h-20 w-20 items-center justify-center rounded-full border border-azure-400/45 bg-azure-500"
               onPress={acceptImage}
             >
               <Ionicons name="checkmark-done" size={38} color="white" />

@@ -9,19 +9,17 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { BoxProvider } from "@/contexts/BoxContext";
 import { InventoryProvider } from "@/contexts/InventoryContext";
 import { OptimalProvider } from "@/contexts/OptimalContext";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import AppErrorBoundary from "@/components/ui/AppErrorBoundary";
+import StartupSplash from "@/components/ui/StartupSplash";
+import { SnackbarProvider, useSnackbar } from "@/components/ui/SnackbarProvider";
 import NetInfo from "@react-native-community/netinfo";
 
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { ThemeProvider, Theme } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View, LogBox } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { LogBox, Text, View } from "react-native";
 
 // Disable Reanimated strict mode warnings caused by NativeWind v4 internal style animations
 configureReanimatedLogger({
@@ -34,11 +32,42 @@ LogBox.ignoreLogs([
   "SafeAreaView has been deprecated and will be removed in a future release",
 ]);
 
+const industrialTheme: Theme = {
+  dark: true,
+  colors: {
+    primary: "#007FFF",
+    background: "#001224",
+    card: "#001933",
+    text: "#E5F2FF",
+    border: "#054161",
+    notification: "#3399FF",
+  },
+  fonts: {
+    regular: {
+      fontFamily: "System",
+      fontWeight: "400",
+    },
+    medium: {
+      fontFamily: "System",
+      fontWeight: "500",
+    },
+    bold: {
+      fontFamily: "System",
+      fontWeight: "700",
+    },
+    heavy: {
+      fontFamily: "System",
+      fontWeight: "800",
+    },
+  },
+};
+
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
   const { user, isLoading } = useAuth();
+  const { showSnackbar } = useSnackbar();
   const segments = useSegments();
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const previousConnectionRef = useRef<boolean | null>(null);
 
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -52,6 +81,17 @@ function RootLayoutNav() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const previous = previousConnectionRef.current;
+    if (previous === false && isConnected === true) {
+      showSnackbar("Back online", "success");
+    } else if (isConnected === false) {
+      showSnackbar("Offline - Reconnecting...", "info", 3200);
+    }
+
+    previousConnectionRef.current = isConnected;
+  }, [isConnected, showSnackbar]);
 
   useEffect(() => {
     if (!isLoading && loaded && isConnected) {
@@ -69,11 +109,11 @@ function RootLayoutNav() {
 
   if (isConnected === false) {
     return (
-      <View className="flex-1 justify-center items-center bg-white/70 dark:bg-gray-950 px-6">
-        <Text className="text-3xl font-bold text-gray-800 dark:text-white mb-4 text-center">
+      <View className="flex-1 items-center justify-center bg-navy-950 px-6">
+        <Text className="mb-4 text-center text-3xl font-bold text-azure-50">
           🚫 No Internet Connection
         </Text>
-        <Text className="text-lg text-gray-600 dark:text-gray-300 text-center">
+        <Text className="text-center text-lg text-azure-200">
           Please check your connection and try again.
         </Text>
       </View>
@@ -81,19 +121,12 @@ function RootLayoutNav() {
   }
 
   if (isLoading || isConnected === null) {
-    return (
-      <View className="flex-1 justify-center items-center bg-white/70 dark:bg-gray-950">
-        <ActivityIndicator size="large" color="#070fff" />
-        <Text className="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-4">
-          Loading...
-        </Text>
-      </View>
-    );
+    return <StartupSplash statusText="Loading secure workspace" />;
   }
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+    <ThemeProvider value={industrialTheme}>
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
@@ -112,14 +145,18 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <InventoryProvider>
-        <BoxProvider>
-          <OptimalProvider>
-            <RootLayoutNav />
-          </OptimalProvider>
-        </BoxProvider>
-      </InventoryProvider>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <SnackbarProvider>
+        <AuthProvider>
+          <InventoryProvider>
+            <BoxProvider>
+              <OptimalProvider>
+                <RootLayoutNav />
+              </OptimalProvider>
+            </BoxProvider>
+          </InventoryProvider>
+        </AuthProvider>
+      </SnackbarProvider>
+    </AppErrorBoundary>
   );
 }

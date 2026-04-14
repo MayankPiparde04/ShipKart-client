@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/Shipwise_logo_t.png",
     "scheme": "shipwise",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -14,7 +14,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Shipwise_logo_t.png",
-        "backgroundColor": "#dadada"
+        "backgroundColor": "#001224"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -34,9 +34,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/Shipwise_logo_t.png",
           "resizeMode": "contain",
-          "backgroundColor": "#111111"
+          "backgroundColor": "#001224"
         }
       ],
       [

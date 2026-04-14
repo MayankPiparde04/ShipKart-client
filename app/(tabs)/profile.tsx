@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { apiService } from "@/services/api";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -16,13 +16,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const LIGHT_FOREGROUND = "#EAF4FF";
+
 export default function ProfileScreen() {
   const { user, logout, updateUserContext } = useAuth();
   const { height } = useWindowDimensions();
-
-  // Theme integration
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -121,27 +120,24 @@ export default function ProfileScreen() {
     }
     return (
       <View className="mb-4">
-        <Text className="text-gray-500 dark:text-gray-400 text-xs mb-1 flex-row items-center">
-          <Ionicons
-            name={icon as any}
-            size={14}
-            color={isDark ? "#9CA3AF" : "#6B7280"}
-          />{" "}
+        <Text className="mb-1 flex-row items-center text-xs text-azure-200">
+          <Ionicons name={icon as any} size={14} color="#99CCFF" />{" "}
           {label}
         </Text>
 
         {isEditing && key !== "email" ? (
           <TextInput
-            className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-3 rounded-lg border-gray-200 dark:border-gray-700 border"
+            className="rounded-card border border-navy-800/30 bg-navy-900 p-3 text-azure-50"
             value={editedUser[key as keyof typeof editedUser]}
             onChangeText={(text) =>
               setEditedUser({ ...editedUser, [key]: text })
             }
             placeholder={`Enter ${label.toLowerCase()}`}
-            placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+            placeholderTextColor="#99CCFF"
+            selectionColor="#3399FF"
           />
         ) : (
-          <Text className="text-gray-700 dark:text-gray-300 ml-5">
+          <Text className="ml-5 text-azure-50">
             {displayValue || `No ${label.toLowerCase()} provided`}
           </Text>
         )}
@@ -150,30 +146,37 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-100/70 dark:bg-gray-950">
+    <SafeAreaView className="flex-1 bg-navy-950">
       <StatusBar style="light" translucent={true} />
-      <ScrollView className="flex-1">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 20 }}
+      >
         {/* Header with avatar */}
         <View
           style={{ height: height * 0.25 }}
-          className="bg-gray-100/70 dark:bg-gray-950 px-6 pt-6 pb-12 items-center justify-center"
+          className="items-center justify-center bg-navy-950 px-6 pb-12 pt-6"
         >
           <View className="items-center">
-            <View className="w-24 h-24 rounded-full bg-white dark:bg-gray-800 items-center justify-center border border-primary-700">
-              <Text className="text-3xl font-semibold text-primary-600 dark:text-primary-400">
+            <View className="h-24 w-24 items-center justify-center rounded-full border border-navy-800/40 bg-navy-900">
+              <Text className="text-3xl font-semibold text-azure-500">
                 {getInitials(user?.name)}
               </Text>
             </View>
-            <Text className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-3">
+            <Text className="mt-3 text-xl font-bold text-azure-50">
               {user?.name || "User"}
             </Text>
 
             {!isEditing && (
               <TouchableOpacity
-                className="mt-2 bg-primary-600 dark:bg-primary-500 px-4 py-2 rounded-full flex-row items-center"
+                className="mt-2 flex-row items-center rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
                 onPress={() => setIsEditing(true)}
               >
-                <Ionicons name="create-outline" size={16} color="#fff" />
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color={LIGHT_FOREGROUND}
+                />
                 <Text className="ml-1 text-white font-medium">
                   Edit Profile
                 </Text>
@@ -184,13 +187,10 @@ export default function ProfileScreen() {
 
         <View className="px-6 pt-6 pb-10">
           {/* Profile Information Card */}
-          <View className="bg-white/40 dark:bg-gray-900 rounded-xl p-5 mb-6 border-gray-400/40 dark:border-gray-400/40 border">
+          <View className="mb-6 rounded-card border border-navy-800/30 bg-navy-900 p-5">
             <View className="flex-row justify-between items-center mb-4">
               <View className="flex-row items-center">
-                {/* <View className="w-8 h-8 rounded-full bg-blue-600 items-center justify-center">
-                  <Ionicons name="person" size={18} color="#ffffff" />
-                </View> */}
-                <Text className="text-lg font-semibold text-gray-900 dark:text-gray-100 ml-2">
+                <Text className="ml-2 text-lg font-semibold text-azure-50">
                   Personal Information
                 </Text>
               </View>
@@ -198,24 +198,27 @@ export default function ProfileScreen() {
               {isEditing && (
                 <View className="flex-row space-x-2 gap-2">
                   <TouchableOpacity
-                    className="bg-white dark:bg-gray-800 p-2 rounded-lg border-gray-200 dark:border-gray-700 border"
+                    className="rounded-lg border border-navy-800/30 bg-navy-950 p-2"
                     onPress={() => setIsEditing(false)}
                   >
-                    <Ionicons
-                      name="close"
-                      size={18}
-                      color={isDark ? "#9CA3AF" : "#6B7280"}
-                    />
+                    <Ionicons name="close" size={18} color="#99CCFF" />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    className="bg-primary-600 dark:bg-primary-500 p-2 rounded-lg"
+                    className="rounded-lg border border-azure-400/40 bg-azure-500 p-2"
                     onPress={handleSave}
                     disabled={isSaving}
                   >
                     {isSaving ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
+                      <ActivityIndicator
+                        size="small"
+                        color={LIGHT_FOREGROUND}
+                      />
                     ) : (
-                      <Ionicons name="checkmark" size={18} color="#ffffff" />
+                      <Ionicons
+                        name="checkmark"
+                        size={18}
+                        color={LIGHT_FOREGROUND}
+                      />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -241,18 +244,18 @@ export default function ProfileScreen() {
 
           {/* Logout Button */}
           <TouchableOpacity
-            className="bg-red-600 p-4 rounded-lg mb-6 border border-red-500"
+            className="mb-6 rounded-card border border-navy-800/30 bg-navy-900 p-4"
             onPress={logout}
           >
             <View className="flex-row justify-center items-center">
-              <Ionicons name="log-out-outline" size={20} color="#fff" />
-              <Text className="text-white text-center font-semibold ml-2">
+              <Ionicons name="log-out-outline" size={20} color="#99CCFF" />
+              <Text className="ml-2 text-center font-semibold text-azure-50">
                 Logout
               </Text>
             </View>
           </TouchableOpacity>
 
-          <Text className="text-gray-500 dark:text-gray-400 text-xs text-center">
+          <Text className="text-center text-xs text-azure-200">
             ShipWise App v1.0.0
           </Text>
         </View>

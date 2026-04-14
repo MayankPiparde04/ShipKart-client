@@ -1,4 +1,10 @@
-import { createContext, ReactNode, useContext, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { apiService } from "../services/api";
 
 type OptimalPackingInput = {
@@ -53,10 +59,23 @@ export const OptimalProvider = ({ children }: { children: ReactNode }) => {
         {
           id: item._id,
           name: item.productName,
-          length: parseFloat(item.dimensions?.length) || 0,
-          breadth: parseFloat(item.dimensions?.breadth) || 0,
-          height: parseFloat(item.dimensions?.height) || 0,
-          weight: parseFloat(item.weight) || 0,
+          length: Number.parseFloat(item.dimensions?.length) || 0,
+          breadth: Number.parseFloat(item.dimensions?.breadth) || 0,
+          height: Number.parseFloat(item.dimensions?.height) || 0,
+          weight: Number.parseFloat(item.weight) || 0,
+          weight_per_unit:
+            Number.parseFloat(item.weight_per_unit) ||
+            (Number.parseFloat(item.weight) > 0
+              ? Number.parseFloat(item.weight) / 1000
+              : 0),
+          max_vertical_stack:
+            Number.parseInt(item.max_vertical_stack, 10) || 1,
+          crush_resistance_kg:
+            Number.parseFloat(item.crush_resistance_kg) ||
+            (Number.parseFloat(item.weight_per_unit) > 0
+              ? Number.parseFloat(item.weight_per_unit) * 50
+              : 0),
+          leakage_risk: item.leakage_risk || "Low",
           quantity: input.quantity,
           isFragile: item.isFragile || false,
           price: item.price || 0,
@@ -71,10 +90,18 @@ export const OptimalProvider = ({ children }: { children: ReactNode }) => {
           productInfo: {
             name: item.productName,
             dimensions: `${item.dimensions?.length} × ${item.dimensions?.breadth} × ${item.dimensions?.height} cm`,
-            weight: parseFloat(item.weight) || 0,
+            weight: Number.parseFloat(item.weight) || 0,
             canRotate: true,
             isFragile: item.isFragile || false,
             requestedQuantity: input.quantity,
+            max_vertical_stack:
+              Number.parseInt(item.max_vertical_stack, 10) || 1,
+            crush_resistance_kg:
+              Number.parseFloat(item.crush_resistance_kg) ||
+              (Number.parseFloat(item.weight_per_unit) > 0
+                ? Number.parseFloat(item.weight_per_unit) * 50
+                : 0),
+            leakage_risk: item.leakage_risk || "Low",
           },
         };
         setResult(enrichedResult as OptimalPackingOutput);
@@ -90,10 +117,13 @@ export const OptimalProvider = ({ children }: { children: ReactNode }) => {
 
   const clearResult = () => setResult(null);
 
+  const providerValue = useMemo(
+    () => ({ loading, error, result, fetchOptimalPacking, clearResult }),
+    [loading, error, result],
+  );
+
   return (
-    <OptimalContext.Provider
-      value={{ loading, error, result, fetchOptimalPacking, clearResult }}
-    >
+    <OptimalContext.Provider value={providerValue}>
       {children}
     </OptimalContext.Provider>
   );

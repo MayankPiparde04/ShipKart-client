@@ -3,7 +3,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { Ionicons } from "@expo/vector-icons";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useRouter } from "expo-router";
@@ -25,25 +24,25 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const Login = React.memo(() => {
   const { login } = useAuth();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const { fetchItems } = useInventory();
   const { fetchBoxes } = useBoxes();
 
   const HeaderComponent = useMemo(
     () => (
-      <View className="mb-10 items-center pt-10">
-        <View className="w-24 h-24 bg-primary-600 dark:bg-primary-500 rounded-[28px] items-center justify-center mb-6 shadow-xl shadow-primary-600/30 rotate-3">
+      <View className="mb-8 items-center pt-8">
+        <View className="mb-6 h-24 w-24 rotate-3 items-center justify-center rounded-[28px] border border-azure-400/40 bg-azure-500">
           <FontAwesome5 name="shipping-fast" size={36} color="white" />
         </View>
-        <Text className="text-4xl font-extrabold text-gray-900 dark:text-white mb-3 text-center tracking-tight">
+        <Text className="mb-3 text-center text-4xl font-extrabold tracking-tight text-azure-50">
           Welcome Back
         </Text>
-        <Text className="text-lg text-gray-500 dark:text-gray-400 text-center font-medium">
+        <Text className="text-center text-lg font-medium text-azure-200">
           Sign in to your ShipWise account
         </Text>
       </View>
@@ -93,10 +92,10 @@ const Login = React.memo(() => {
   return (
     <SafeAreaView
       edges={["top", "bottom"]}
-      className="flex-1 bg-white dark:bg-[#0f172a]"
+      className="flex-1 bg-navy-950"
     >
       <StatusBar
-        style={isDark ? "light" : "dark"}
+        style="light"
         backgroundColor="transparent"
         translucent={true}
       />
@@ -109,7 +108,7 @@ const Login = React.memo(() => {
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: "center",
-            paddingHorizontal: 32,
+            paddingHorizontal: 24,
             paddingVertical: 24,
           }}
           keyboardShouldPersistTaps="handled"
@@ -122,18 +121,20 @@ const Login = React.memo(() => {
             {/* Input Form Section */}
             <View className="space-y-6">
               <View className="space-y-2">
-                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">
+                <Text className="ml-1 text-sm font-semibold text-azure-200">
                   Email Address
                 </Text>
-                <View className="relative bg-gray-50 dark:bg-[#1e293b] rounded-2xl border border-gray-200 dark:border-gray-800 focus-within:border-indigo-500 overflow-hidden">
+                <View
+                  className={`relative overflow-hidden rounded-card border bg-navy-900 ${isEmailFocused ? "border-azure-500" : "border-navy-800/30"}`}
+                >
                   <Ionicons
                     name="mail-outline"
                     size={22}
-                    color={isDark ? "#94a3b8" : "#64748b"}
+                    color="#99CCFF"
                     className="absolute left-4 top-[18px] z-10"
                   />
                   <TextInput
-                    className="w-full h-14 pl-12 pr-4 text-base text-gray-900 dark:text-white"
+                    className="h-14 w-full border border-transparent pl-12 pr-4 text-base text-azure-50"
                     placeholder="name@example.com"
                     value={email}
                     onChangeText={setEmail}
@@ -141,30 +142,38 @@ const Login = React.memo(() => {
                     autoCapitalize="none"
                     autoCorrect={false}
                     editable={!isLoading}
-                    placeholderTextColor={isDark ? "#94a3b8" : "#94a3b8"}
+                    placeholderTextColor="#99CCFF"
+                    selectionColor="#3399FF"
+                    onFocus={() => setIsEmailFocused(true)}
+                    onBlur={() => setIsEmailFocused(false)}
                   />
                 </View>
               </View>
 
               <View className="space-y-2">
-                <Text className="text-sm font-semibold text-gray-700 dark:text-gray-300 ml-1">
+                <Text className="ml-1 text-sm font-semibold text-azure-200">
                   Password
                 </Text>
-                <View className="relative bg-gray-50 dark:bg-[#1e293b] rounded-2xl border border-gray-200 dark:border-gray-800 focus-within:border-indigo-500 overflow-hidden">
+                <View
+                  className={`relative overflow-hidden rounded-card border bg-navy-900 ${isPasswordFocused ? "border-azure-500" : "border-navy-800/30"}`}
+                >
                   <Ionicons
                     name="lock-closed-outline"
                     size={22}
-                    color={isDark ? "#94a3b8" : "#64748b"}
+                    color="#99CCFF"
                     className="absolute left-4 top-[18px] z-10"
                   />
                   <TextInput
-                    className="w-full h-14 pl-12 pr-12 text-base text-gray-900 dark:text-white"
+                    className="h-14 w-full border border-transparent pl-12 pr-12 text-base text-azure-50"
                     placeholder="Enter your password"
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                     editable={!isLoading}
-                    placeholderTextColor={isDark ? "#94a3b8" : "#94a3b8"}
+                    placeholderTextColor="#99CCFF"
+                    selectionColor="#3399FF"
+                    onFocus={() => setIsPasswordFocused(true)}
+                    onBlur={() => setIsPasswordFocused(false)}
                   />
                   <TouchableOpacity
                     className="absolute right-4 top-[16px] z-10 p-1"
@@ -174,7 +183,7 @@ const Login = React.memo(() => {
                     <Ionicons
                       name={showPassword ? "eye-off-outline" : "eye-outline"}
                       size={22}
-                      color={isDark ? "#94a3b8" : "#64748b"}
+                      color="#99CCFF"
                     />
                   </TouchableOpacity>
                 </View>
@@ -184,9 +193,9 @@ const Login = React.memo(() => {
               <TouchableOpacity
                 className={`w-full h-14 mt-6 rounded-2xl items-center justify-center flex-row ${
                   isLoading
-                    ? "bg-primary-400 dark:bg-primary-800"
-                    : "bg-primary-600 dark:bg-primary-500 active:bg-primary-700"
-                } shadow-lg shadow-primary-500/30`}
+                    ? "bg-azure-400/65"
+                    : "bg-azure-500 active:bg-azure-400"
+                  } border border-azure-400/40`}
                 onPress={handleLogin}
                 disabled={isLoading}
               >
@@ -207,20 +216,20 @@ const Login = React.memo(() => {
 
             <View className="w-full max-w-lg self-center mt-6">
               <TouchableOpacity className="mb-6 items-center">
-                <Text className="text-primary-600 dark:text-primary-900 font-semibold text-base">
+                <Text className="text-base font-semibold text-azure-500">
                   Forgot your password?
                 </Text>
               </TouchableOpacity>
 
-              <View className="flex-row items-center border-t border-gray-200 dark:border-gray-800 pt-6 justify-center">
-                <Text className="text-gray-500 dark:text-gray-400 text-base">
+              <View className="flex-row items-center justify-center border-t border-navy-800/30 pt-6">
+                <Text className="text-base text-azure-200">
                   Don&apos;t have an account?{" "}
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push("/register")}
                   hitSlop={10}
                 >
-                  <Text className="text-primary-600 dark:text-primary-400 text-base font-bold">
+                  <Text className="text-base font-bold text-azure-500">
                     Sign Up
                   </Text>
                 </TouchableOpacity>

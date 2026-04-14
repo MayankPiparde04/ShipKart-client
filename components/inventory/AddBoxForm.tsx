@@ -40,6 +40,8 @@ export default function AddBoxForm({
           placeholder="e.g. Large Shipping Box"
           value={newBox.box_name}
           onChangeText={(t) => handleChange("box_name", t)}
+          required
+          minLength={2}
         />
 
         <View className="flex-row gap-3">
@@ -50,6 +52,10 @@ export default function AddBoxForm({
             value={newBox.quantity}
             onChangeText={(t) => handleChange("quantity", t)}
             containerClassName="flex-1"
+            required
+            validator={(value) =>
+              value && Number(value) < 1 ? "Quantity must be at least 1" : null
+            }
           />
           <FormField
             label="Max Weight (kg)"
@@ -58,11 +64,12 @@ export default function AddBoxForm({
             value={newBox.max_weight}
             onChangeText={(t) => handleChange("max_weight", t)}
             containerClassName="flex-1"
+            required
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ml-1">
+          <Text className="mb-2 ml-1 text-sm font-medium text-azure-200">
             Dimensions (cm)
           </Text>
           <View className="flex-row gap-3">
@@ -74,6 +81,7 @@ export default function AddBoxForm({
               onChangeText={(t) => handleChange("length", t)}
               containerClassName="flex-1"
               className="text-center"
+              required
             />
             <FormField
               label=""
@@ -83,6 +91,7 @@ export default function AddBoxForm({
               onChangeText={(t) => handleChange("breadth", t)}
               containerClassName="flex-1"
               className="text-center"
+              required
             />
             <FormField
               label=""
@@ -92,12 +101,13 @@ export default function AddBoxForm({
               onChangeText={(t) => handleChange("height", t)}
               containerClassName="flex-1"
               className="text-center"
+              required
             />
           </View>
         </View>
 
         <TouchableOpacity
-          className="bg-orange-600 p-4 rounded-xl mt-6 flex-row justify-center items-center"
+          className="mt-6 flex-row items-center justify-center rounded-xl border border-azure-400/40 bg-azure-500 p-4"
           onPress={onSubmit}
           disabled={isAdding}
         >

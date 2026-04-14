@@ -23,23 +23,26 @@ export default function FormModal({
   onClose,
   title,
   children,
-}: FormModalProps) {
+}: Readonly<FormModalProps>) {
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent={true}
+      statusBarTranslucent
+      presentationStyle="overFullScreen"
+      hardwareAccelerated
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/50">
-        <View className="bg-white dark:bg-gray-900 rounded-t-3xl h-[85%]">
+      <View className="flex-1 justify-end bg-[#001224]/70">
+        <View className="h-[85%] rounded-t-card border border-navy-800/30 bg-navy-900">
           <SafeAreaView className="flex-1">
-            <View className="flex-row justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+            <View className="flex-row items-center justify-between border-b border-navy-800/30 px-6 py-4">
+              <Text className="text-2xl font-bold text-azure-50">
                 {title}
               </Text>
               <TouchableOpacity onPress={onClose} className="p-2">
-                <Ionicons name="close" size={24} color="#6B7280" />
+                <Ionicons name="close" size={24} color="#99CCFF" />
               </TouchableOpacity>
             </View>
 
