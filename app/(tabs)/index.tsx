@@ -3,11 +3,11 @@ import { useBoxes } from "@/contexts/BoxContext";
 import { useHistory } from "@/contexts/HistoryContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { BoxIcon, Package, TrendingUp } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -27,7 +27,8 @@ import {
 import { BarChart } from "react-native-chart-kit";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const isAuthenticated = Boolean(user);
   const { items, dailyData, dailySold, fetchItems } = useInventory();
   const { boxes, fetchBoxes } = useBoxes();
   const { transactions, fetchTransactions } = useHistory();
@@ -92,11 +93,23 @@ export default function Home() {
     setLoading(false);
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthLoading && isAuthenticated) {
+        fetchTransactions(100);
+      }
+    }, [fetchTransactions, isAuthenticated, isAuthLoading]),
+  );
+
   useEffect(() => {
-    fetchTransactions(100);
-  }, [fetchTransactions]);
+    if (!isAuthLoading && isAuthenticated) {
+      // Keep loading state in sync after auth resolves.
+      setLoading(false);
+    }
+  }, [isAuthLoading, isAuthenticated]);
 
   const handleRefresh = async () => {
+    if (!isAuthenticated) return;
     setRefreshing(true);
     try {
       await Promise.all([fetchItems(), fetchBoxes(), fetchTransactions(100)]);

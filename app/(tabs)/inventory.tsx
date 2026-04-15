@@ -6,13 +6,14 @@ import FormModal from "@/components/ui/FormModal";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { triggerSuccessHaptic } from "@/utils/haptics";
 import { rankByFuzzySearch } from "@/utils/search";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -40,8 +41,36 @@ interface Box {
   brand?: string;
 }
 
+const sortByName = <T,>(list: T[], picker: (entry: T) => string) =>
+  [...list].sort((left, right) =>
+    picker(left).localeCompare(picker(right), undefined, { sensitivity: "base" }),
+  );
+
+const getEmptyMessage = (
+  filter: "all" | "low" | "out",
+  kind: "items" | "boxes",
+) => {
+  if (filter === "low") {
+    return kind === "items"
+      ? "No Low Stock items found."
+      : "No Low Stock boxes found.";
+  }
+
+  if (filter === "out") {
+    return kind === "items"
+      ? "No Out of Stock items found."
+      : "No Out of Stock boxes found.";
+  }
+
+  return kind === "items"
+    ? "No items in stock yet."
+    : "No boxes available yet.";
+};
+
 export default function Inventory() {
   const { showSnackbar } = useSnackbar();
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const isAuthenticated = Boolean(user);
   type StockFilter = "all" | "low" | "out";
   // Tab state
   const [activeTab, setActiveTab] = useState<"items" | "boxes">("items");
@@ -109,6 +138,7 @@ export default function Inventory() {
 
   const params = useLocalSearchParams();
   const tabBarHeight = useBottomTabBarHeight();
+  const hasLoadedOnFocusRef = useRef(false);
 
   // Pre-fill form
   React.useEffect(() => {
@@ -141,25 +171,40 @@ export default function Inventory() {
     }
   }, [params.prefill]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthLoading || !isAuthenticated) return;
+
+      if (!hasLoadedOnFocusRef.current) {
+        hasLoadedOnFocusRef.current = true;
+      }
+
+      fetchItems(true);
+      fetchBoxes(true);
+    }, [isAuthLoading, isAuthenticated, fetchItems, fetchBoxes]),
+  );
+
   // Filters
   const filteredItems = useMemo(() => {
     const stockMatched = items.filter((item) => {
       if (stockFilter === "out") return Number(item.quantity) <= 0;
-      if (stockFilter === "low") return Number(item.quantity) > 0 && Number(item.quantity) < 10;
+      if (stockFilter === "low") return Number(item.quantity) < 20;
       return true;
     });
 
-    return rankByFuzzySearch(stockMatched, searchText, (item) => item.productName);
+    const searched = rankByFuzzySearch(stockMatched, searchText, (item) => item.productName);
+    return sortByName(searched, (item) => item.productName);
   }, [items, searchText, stockFilter]);
 
   const filteredBoxes = useMemo(() => {
     const stockMatched = boxes.filter((box) => {
       if (stockFilter === "out") return Number(box.quantity) <= 0;
-      if (stockFilter === "low") return Number(box.quantity) > 0 && Number(box.quantity) < 10;
+      if (stockFilter === "low") return Number(box.quantity) < 20;
       return true;
     });
 
-    return rankByFuzzySearch(stockMatched, searchText, (box) => box.box_name);
+    const searched = rankByFuzzySearch(stockMatched, searchText, (box) => box.box_name);
+    return sortByName(searched, (box) => box.box_name);
   }, [boxes, searchText, stockFilter]);
 
   // Handlers
@@ -403,6 +448,8 @@ export default function Inventory() {
             onRefresh={onRefresh}
             onItemPress={(item) => handleEditItem(item)}
             onDeletePress={(item) => handleDeleteItem(item)}
+            emptyMessage={getEmptyMessage(stockFilter, "items")}
+            bottomInset={tabBarHeight}
             onAddPress={() => {
               setEditItemId(null);
               setNewItem({
@@ -429,6 +476,8 @@ export default function Inventory() {
             onRefresh={onRefresh}
             onBoxPress={handleEditBox}
             onDeletePress={handleDeleteBox}
+            emptyMessage={getEmptyMessage(stockFilter, "boxes")}
+            bottomInset={tabBarHeight}
             onAddPress={() => {
               setEditBoxId(null);
               setNewBox({
@@ -446,7 +495,7 @@ export default function Inventory() {
       )}
 
       <TouchableOpacity
-        className="absolute right-6 h-14 w-14 items-center justify-center rounded-full border border-azure-400/40 bg-azure-500"
+        className="absolute right-6 z-20 h-14 w-14 items-center justify-center rounded-full border border-azure-400/40 bg-azure-500"
         style={{ bottom: tabBarHeight + 16 }}
         onPress={() => {
           if (activeTab === "items") {

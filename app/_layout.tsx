@@ -14,7 +14,6 @@ import AppErrorBoundary from "@/components/ui/AppErrorBoundary";
 import StartupSplash from "@/components/ui/StartupSplash";
 import { SnackbarProvider, useSnackbar } from "@/components/ui/SnackbarProvider";
 import NetInfo from "@react-native-community/netinfo";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ThemeProvider, Theme } from "@react-navigation/native";
 import { useFonts } from "expo-font";
@@ -65,6 +64,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const previousConnectionRef = useRef<boolean | null>(null);
+  const loginRedirectedRef = useRef(false);
 
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -79,25 +79,6 @@ function RootLayoutNav() {
     return () => unsubscribe();
   }, []);
 
-  // Check AsyncStorage for token at startup and redirect if missing
-  useEffect(() => {
-    const checkAuthToken = async () => {
-      try {
-        const token = await AsyncStorage.getItem("accessToken");
-        if (!token && !isLoading && loaded) {
-          // Token is missing, redirect to login
-          router.replace("/login");
-        }
-      } catch (error) {
-        console.error("Error checking auth token:", error);
-      }
-    };
-
-    if (!isLoading && loaded) {
-      checkAuthToken();
-    }
-  }, [isLoading, loaded]);
-
   useEffect(() => {
     const previous = previousConnectionRef.current;
     if (previous === false && isConnected === true) {
@@ -110,12 +91,14 @@ function RootLayoutNav() {
   }, [isConnected, showSnackbar]);
 
   useEffect(() => {
-    if (!isLoading && loaded && isConnected) {
+    if (!isLoading && loaded && isConnected && segments.length > 0) {
       const inAuthGroup = segments[0] === "(tabs)";
 
       if (user && !inAuthGroup) {
+        loginRedirectedRef.current = false;
         router.replace("/(tabs)");
-      } else if (!user && inAuthGroup) {
+      } else if (!user && inAuthGroup && !loginRedirectedRef.current) {
+        loginRedirectedRef.current = true;
         router.replace("/login");
       }
     }

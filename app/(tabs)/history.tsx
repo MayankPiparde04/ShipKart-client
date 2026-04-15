@@ -1,5 +1,6 @@
 import SkeletonCard from "@/components/ui/SkeletonCard";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { ShipmentTransaction, useHistory } from "@/contexts/HistoryContext";
 import { formatCurrencyInr } from "@/utils/currency";
 import { triggerSuccessHaptic } from "@/utils/haptics";
@@ -108,6 +109,8 @@ function TransactionCard({
 }
 
 export default function HistoryScreen() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const isAuthenticated = Boolean(user);
   const { transactions, isLoading, fetchTransactions, deleteTransaction } = useHistory();
   const tabBarHeight = useBottomTabBarHeight();
   const { showSnackbar } = useSnackbar();
@@ -117,8 +120,10 @@ export default function HistoryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchTransactions();
-    }, [fetchTransactions]),
+      if (!isAuthLoading && isAuthenticated) {
+        fetchTransactions();
+      }
+    }, [fetchTransactions, isAuthenticated, isAuthLoading]),
   );
 
   const emptyComponent = useMemo(

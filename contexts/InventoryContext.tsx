@@ -230,7 +230,8 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateItem = async (id: string, itemUpdate: Partial<Item>) => {
-    const response = await apiService.addOrUpdateItem({
+    const response = await apiService.updateItem(id, {
+      _id: id,
       ...itemUpdate,
       productName: itemUpdate.productName || "",
       quantity: itemUpdate.quantity || 0,

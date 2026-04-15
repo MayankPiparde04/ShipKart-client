@@ -18,6 +18,23 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
+let lastCallTime = 0;
+let isRequestPending = false;
+let isRedirectingToLogin = false;
+
+const shouldAbortByCooldown = () => {
+  const now = Date.now();
+  if (now - lastCallTime < 2000) return true;
+  lastCallTime = now;
+  return false;
+};
+
+const shouldSkipForMissingToken = (token: string | null, endpoint: string) =>
+  !token &&
+  !endpoint.includes('/login') &&
+  !endpoint.includes('/signup') &&
+  !endpoint.includes('/register');
+
 const PUBLIC_ENDPOINTS = new Set([
   '/login',
   '/register',
@@ -35,11 +52,17 @@ const isPublicEndpoint = (endpoint: string) => {
 };
 
 const redirectToLogin = async () => {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
   await clearAuthTokens();
   try {
     router.replace('/login');
   } catch {
     // Ignore navigation failures before the root navigator mounts.
+  } finally {
+    setTimeout(() => {
+      isRedirectingToLogin = false;
+    }, 500);
   }
 };
 
@@ -154,6 +177,42 @@ const normalizeError = (data: any, status: number) => {
   return createApiError(extractedMessage, status, data);
 };
 
+const resolveRequestToken = async (endpoint: string, isPublic: boolean) => {
+  let token = await getAccessToken();
+
+  if (shouldSkipForMissingToken(token, endpoint)) {
+    return { skip: true as const, token: null as string | null };
+  }
+
+  if (!token && !isPublic) {
+    token = await refreshAccessToken();
+    if (!token) {
+      await redirectToLogin();
+      throw createApiError('Access token required. Redirecting to login.', 401);
+    }
+  }
+
+  return { skip: false as const, token };
+};
+
+const fetchWithRetryOn401 = async (
+  url: string,
+  config: RequestInit & { headers: HeadersInit & Record<string, string> },
+  isPublic: boolean,
+) => {
+  let response = await fetch(url, config);
+  if (response.status === 401 && !isPublic) {
+    const retriedResponse = await refreshExpiredRequest(url, config);
+    if (retriedResponse) {
+      response = retriedResponse;
+    } else {
+      await redirectToLogin();
+    }
+  }
+
+  return response;
+};
+
 // Custom Fetch Wrapper
 const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
   const { timeout = 30000, params, headers, ...rest } = options;
@@ -161,31 +220,26 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
   const id = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const isPublic = isPublicEndpoint(endpoint);
-    let token = await getAccessToken();
+    if (isRequestPending) {
+      return null;
+    }
 
-    // Guard: If no token and endpoint is protected, redirect to login
-    if (!token && !isPublic) {
-      token = await refreshAccessToken();
-      if (!token) {
-        await redirectToLogin();
-        // Return a 401-like error response instead of throwing
-        throw createApiError('Access token required. Redirecting to login.', 401);
-      }
+    if (shouldAbortByCooldown()) {
+      return null;
+    }
+
+    isRequestPending = true;
+
+    const isPublic = isPublicEndpoint(endpoint);
+    const { skip, token } = await resolveRequestToken(endpoint, isPublic);
+    if (skip) {
+      return null;
     }
 
     const url = appendQueryParams(endpoint, params);
     const config = buildRequestConfig(rest, headers, controller.signal, token);
 
-    let response = await fetch(url, config);
-    if (response.status === 401 && !isPublic) {
-      const retriedResponse = await refreshExpiredRequest(url, config);
-      if (retriedResponse) {
-        response = retriedResponse;
-      } else {
-        await redirectToLogin();
-      }
-    }
+    const response = await fetchWithRetryOn401(url, config, isPublic);
 
     const data = await parseResponseData(response);
     
@@ -203,16 +257,39 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
     console.error('API Request Error:', error);
     throw error;
   } finally {
+    isRequestPending = false;
     clearTimeout(id);
   }
 };
 
+const AUTH_GUARD_RESPONSE = {
+  data: {
+    success: false,
+    message: 'Authentication required',
+    skipped: true,
+  },
+};
+
+const ensureResponseEnvelope = (response: { data: any } | null) => response ?? AUTH_GUARD_RESPONSE;
+
 // Compatible API object
 const api = {
-    get: (url: string, config?: any) => customFetch(url, { ...config, method: 'GET' }),
-    post: (url: string, data?: any, config?: any) => customFetch(url, { ...config, method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) }),
-    put: (url: string, data?: any, config?: any) => customFetch(url, { ...config, method: 'PUT', body: JSON.stringify(data) }),
-    delete: (url: string, config?: any) => customFetch(url, { ...config, method: 'DELETE' }),
+    get: async (url: string, config?: any) =>
+      ensureResponseEnvelope(await customFetch(url, { ...config, method: 'GET' })),
+    post: async (url: string, data?: any, config?: any) =>
+      ensureResponseEnvelope(
+        await customFetch(url, {
+          ...config,
+          method: 'POST',
+          body: data instanceof FormData ? data : JSON.stringify(data),
+        }),
+      ),
+    put: async (url: string, data?: any, config?: any) =>
+      ensureResponseEnvelope(
+        await customFetch(url, { ...config, method: 'PUT', body: JSON.stringify(data) }),
+      ),
+    delete: async (url: string, config?: any) =>
+      ensureResponseEnvelope(await customFetch(url, { ...config, method: 'DELETE' })),
 };
 
 // API Service object to match InventoryContext expectations
@@ -230,6 +307,15 @@ export const apiService = {
   addOrUpdateItem: async (item: any) => {
     try {
       const response = await api.post('/senditemdata', item);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  updateItem: async (id: string, item: any) => {
+    try {
+      const response = await api.put(`/updateitem/${id}`, item);
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -417,8 +503,9 @@ export const apiService = {
         timeout: 120000, 
         signal: signal,
       });
-      
-      return response.data;
+
+      const ensuredResponse = ensureResponseEnvelope(response);
+      return ensuredResponse.data;
     } catch (error: any) {
       if (error.name === 'AbortError') {
         throw new Error('Prediction cancelled by user');

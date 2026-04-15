@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -15,8 +15,11 @@ import { LineChart, PieChart } from "react-native-chart-kit";
 
 // Direct axios import
 import api from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AnalyticsDashboard() {
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const isAuthenticated = Boolean(user);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [overview, setOverview] = useState<any>(null);
@@ -86,31 +89,48 @@ export default function AnalyticsDashboard() {
     if (historyRes.data.success) setHistory(historyRes.data.data);
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-    const load = async () => {
-      try {
-        await fetchData();
-      } catch (error: any) {
-        if (isMounted) {
-          setErrorMessage(
-            error?.message || "Unable to load analytics right now. Please try again.",
-          );
-        }
-      } finally {
+      if (isAuthLoading) {
+        return () => {
+          isMounted = false;
+        };
+      }
+
+      if (!isAuthenticated) {
         if (isMounted) {
           setLoading(false);
         }
+        return () => {
+          isMounted = false;
+        };
       }
-    };
 
-    load();
+      const load = async () => {
+        try {
+          await fetchData();
+        } catch (error: any) {
+          if (isMounted) {
+            setErrorMessage(
+              error?.message || "Unable to load analytics right now. Please try again.",
+            );
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
 
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchData]);
+      load();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [fetchData, isAuthenticated, isAuthLoading]),
+  );
 
   const hasHistoryData = history.some((d) => (d.count ?? 0) > 0);
   const hasInventoryData =
@@ -145,6 +165,7 @@ export default function AnalyticsDashboard() {
             <TouchableOpacity
               className="mt-3 self-start rounded-full border border-azure-400/40 bg-azure-500 px-4 py-2"
               onPress={async () => {
+                if (!isAuthenticated) return;
                 setLoading(true);
                 try {
                   await fetchData();

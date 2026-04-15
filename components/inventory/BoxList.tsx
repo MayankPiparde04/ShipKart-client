@@ -2,15 +2,13 @@ import React, { memo } from "react";
 import {
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   Pressable,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from "react-native";
-import { Package, PackagePlus, Trash2 } from "lucide-react-native";
+import { Package, PackagePlus, Pencil, Trash2 } from "lucide-react-native";
 import SkeletonCard from "../ui/SkeletonCard";
 
 interface Box {
@@ -31,69 +29,81 @@ interface BoxListProps {
   onBoxPress: (box: Box) => void;
   onDeletePress: (box: Box) => void;
   onAddPress: () => void;
+  emptyMessage?: string;
+  bottomInset?: number;
 }
 
 const BoxListItem = memo(function BoxListItem({
   item,
   onPress,
   onDelete,
-  cardWidth,
 }: {
   item: Box;
   onPress: () => void;
   onDelete: () => void;
-  cardWidth: `${number}%`;
 }) {
+  const isLowStock = Number(item.quantity) < 20;
+
   return (
     <TouchableOpacity
-      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-4 py-4"
-      style={{ width: cardWidth }}
+      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-3 py-3"
       onPress={onPress}
+      activeOpacity={0.86}
     >
-      <View className="flex-row items-center justify-between gap-4">
-        <View className="mr-1 rounded-full bg-azure-500/15 p-3">
-          <Package size={24} strokeWidth={1.5} color="#007FFF" />
+      <View className="flex-row items-center gap-3">
+        <View className="h-16 w-16 items-center justify-center rounded-lg border border-navy-800/40 bg-[#001933]">
+          <Package size={24} strokeWidth={1.5} color="#99CCFF" />
         </View>
-        <View className="flex-1">
-          <Text className="mb-1 text-lg font-semibold text-azure-50">
+
+        <View className="min-w-0 flex-1">
+          <Text className="text-base font-bold text-azure-50" numberOfLines={1}>
             {item.box_name}
           </Text>
-          <Text className="mb-3 text-sm text-azure-200">
-            Shipping container
+          <Text className="mt-0.5 text-sm text-azure-200" numberOfLines={1}>
+            Shipping box
           </Text>
-          <View className="flex-row flex-wrap gap-2">
-            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
-              <Text className="text-xs text-azure-200">
-                {item.length}x{item.breadth}x{item.height} cm
-              </Text>
-            </View>
-            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
-              <Text className="text-xs text-azure-200">
-                Max {item.max_weight}kg
-              </Text>
-            </View>
+          <View className="mt-2 self-start rounded-md border border-[#054161]/55 bg-[#001933] px-2 py-1">
+            <Text className="text-[11px] text-azure-200">
+              {item.length}x{item.breadth}x{item.height} cm
+            </Text>
           </View>
         </View>
-        <View className="w-24 items-end self-stretch">
-          <View className="w-full items-end">
-            <Text className="text-xs uppercase tracking-[1px] text-azure-200">
-              Stock
-            </Text>
-          </View>
-          <View className="mt-2 w-full items-end">
-            <Text className="text-2xl font-bold text-azure-50">
-              {item.quantity}
-            </Text>
-          </View>
 
-          <View className="mt-auto w-full items-end pt-3">
+        <View className="w-14 items-end">
+          <Text className="text-[10px] uppercase tracking-[0.8px] text-azure-200">Stock</Text>
+          <Text className={`mt-1 text-xl font-bold ${isLowStock ? "text-[#F87171]" : "text-azure-50"}`}>
+            {item.quantity}
+          </Text>
+        </View>
+
+        <View className="ml-1 w-16 items-end self-stretch justify-between">
+          <Text className="text-xs font-semibold text-azure-200">Max {item.max_weight}kg</Text>
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={onPress}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.box_name}`}
+              style={({ pressed }) => ({
+                height: 34,
+                width: 34,
+                borderRadius: 999,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? "rgba(0, 127, 255, 0.16)" : "transparent",
+                borderWidth: 1,
+                borderColor: "rgba(5, 65, 97, 0.35)",
+              })}
+            >
+              <Pencil size={15} strokeWidth={1.7} color="#99CCFF" />
+            </Pressable>
+
             <Pressable
               onPress={onDelete}
               accessibilityRole="button"
               accessibilityLabel={`Delete ${item.box_name}`}
               style={({ pressed }) => ({
-                height: 40,
-                width: 40,
+                height: 34,
+                width: 34,
                 borderRadius: 999,
                 alignItems: "center",
                 justifyContent: "center",
@@ -102,7 +112,7 @@ const BoxListItem = memo(function BoxListItem({
                 borderColor: pressed ? "rgba(239, 68, 68, 0.35)" : "rgba(5, 65, 97, 0.35)",
               })}
             >
-              <Trash2 size={18} strokeWidth={1.5} color="#EF4444" />
+              <Trash2 size={15} strokeWidth={1.7} color="#EF4444" />
             </Pressable>
           </View>
         </View>
@@ -119,11 +129,9 @@ export default function BoxList({
   onBoxPress,
   onDeletePress,
   onAddPress,
+  emptyMessage = "No boxes available yet.",
+  bottomInset = 0,
 }: Readonly<BoxListProps>) {
-  const { width } = useWindowDimensions();
-  const numColumns = Platform.OS === "web" && width >= 960 ? 3 : 2;
-  const cardWidth: `${number}%` = numColumns === 3 ? "32%" : "48.5%";
-
   if (isLoading) {
     return (
       <View className="flex-1 px-4 pt-4">
@@ -139,9 +147,6 @@ export default function BoxList({
       <FlatList
         data={boxes}
         keyExtractor={(box) => box._id}
-        numColumns={numColumns}
-        key={`box-grid-${numColumns}`}
-        columnWrapperStyle={{ justifyContent: "space-between" }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -150,13 +155,12 @@ export default function BoxList({
         updateCellsBatchingPeriod={60}
         windowSize={7}
         removeClippedSubviews
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomInset + 120 }}
         renderItem={({ item }) => (
           <BoxListItem
             item={item}
             onPress={() => onBoxPress(item)}
             onDelete={() => onDeletePress(item)}
-            cardWidth={cardWidth}
           />
         )}
         ListEmptyComponent={
@@ -168,7 +172,7 @@ export default function BoxList({
             />
             <Package size={46} strokeWidth={1.5} color="#99CCFF" />
             <Text className="mt-4 text-lg font-semibold text-azure-50">Empty Warehouse</Text>
-            <Text className="mt-1 text-center text-azure-200">No boxes available yet.</Text>
+            <Text className="mt-1 text-center text-azure-200">{emptyMessage}</Text>
             <TouchableOpacity
               onPress={onAddPress}
               className="mt-4 flex-row items-center rounded-full border border-azure-400/40 bg-azure-500 px-6 py-2"

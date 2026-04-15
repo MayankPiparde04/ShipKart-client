@@ -2,16 +2,14 @@ import React, { memo } from "react";
 import {
   FlatList,
   Image,
-  Platform,
   RefreshControl,
   Pressable,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
-import { Box, PackagePlus, Trash2 } from "lucide-react-native";
+import { Box, PackagePlus, Pencil, Trash2 } from "lucide-react-native";
 import SkeletonCard from "../ui/SkeletonCard";
 
 interface Item {
@@ -34,82 +32,92 @@ interface InventoryListProps {
   onItemPress: (item: Item) => void;
   onDeletePress: (item: Item) => void;
   onAddPress: () => void;
+  emptyMessage?: string;
+  bottomInset?: number;
 }
 
 const InventoryListItem = memo(function InventoryListItem({
   item,
   onPress,
   onDelete,
-  cardWidth,
 }: {
   item: Item;
   onPress: () => void;
   onDelete: () => void;
-  cardWidth: `${number}%`;
 }) {
+  const isLowStock = Number(item.quantity) < 20;
+
   return (
-    <View
-      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-4 py-4"
-      style={{ width: cardWidth }}
+    <TouchableOpacity
+      className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-3 py-3"
+      onPress={onPress}
+      activeOpacity={0.86}
     >
-      <View className="flex-row items-start justify-between gap-4">
-        <TouchableOpacity className="flex-1" onPress={onPress}>
+      <View className="flex-row items-center gap-3">
+        <View className="h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-navy-800/40 bg-[#001933]">
           {item.imageUrl ? (
             <ExpoImage
               source={{ uri: item.imageUrl }}
               cachePolicy="memory-disk"
               contentFit="cover"
               transition={120}
-              style={{ width: "100%", height: 108, borderRadius: 12, marginBottom: 10 }}
+              style={{ width: "100%", height: "100%" }}
             />
-          ) : null}
-          <Text className="mb-1 text-lg font-semibold text-azure-50">
+          ) : (
+            <Box size={20} strokeWidth={1.5} color="#99CCFF" />
+          )}
+        </View>
+
+        <View className="min-w-0 flex-1">
+          <Text className="text-base font-bold text-azure-50" numberOfLines={1}>
             {item.productName}
           </Text>
-          <Text className="mb-3 text-sm text-azure-200">
+          <Text className="mt-0.5 text-sm text-azure-200" numberOfLines={1}>
             {item.brand ? `${item.brand} • ` : ""}
             {item.category || "Uncategorized"}
           </Text>
-          <View className="flex-row flex-wrap gap-2">
-            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
-              <Text className="text-xs text-azure-200">
-                {item.dimensions.length}x{item.dimensions.breadth}x
-                {item.dimensions.height} cm
-              </Text>
-            </View>
-            <View className="rounded-full border border-[#054161]/50 bg-[#001933] px-3 py-1">
-              <Text className="text-xs text-azure-200">{item.weight}g</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-        <View className="w-24 items-end self-stretch pr-3">
-          <View className="w-full items-end">
-            <Text className="text-xs uppercase tracking-[1px] text-azure-200">
-              Units
+          <View className="mt-2 self-start rounded-md border border-[#054161]/55 bg-[#001933] px-2 py-1">
+            <Text className="text-[11px] text-azure-200">
+              {item.dimensions.length}x{item.dimensions.breadth}x{item.dimensions.height} cm
             </Text>
           </View>
+        </View>
 
-          <View className="mt-2 w-full items-end">
-            <Text className="text-2xl font-bold text-azure-50">
-              {item.quantity}
-            </Text>
-          </View>
+        <View className="w-14 items-end">
+          <Text className="text-[10px] uppercase tracking-[0.8px] text-azure-200">Stock</Text>
+          <Text className={`mt-1 text-xl font-bold ${isLowStock ? "text-[#F87171]" : "text-azure-50"}`}>
+            {item.quantity}
+          </Text>
+        </View>
 
-          <View className="mt-auto w-full items-end gap-3">
-            <Text className="mt-2 text-xs uppercase tracking-[1px] text-azure-200">
-              Price
-            </Text>
-            <Text className="text-sm font-semibold text-[#00F6FF]">
-              ₹{item.price}
-            </Text>
+        <View className="ml-1 w-16 items-end self-stretch justify-between">
+          <Text className="text-sm font-semibold text-[#00F6FF]">₹{item.price}</Text>
+          <View className="flex-row gap-2">
+            <Pressable
+              onPress={onPress}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.productName}`}
+              style={({ pressed }) => ({
+                height: 34,
+                width: 34,
+                borderRadius: 999,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: pressed ? "rgba(0, 127, 255, 0.16)" : "transparent",
+                borderWidth: 1,
+                borderColor: "rgba(5, 65, 97, 0.35)",
+              })}
+            >
+              <Pencil size={15} strokeWidth={1.7} color="#99CCFF" />
+            </Pressable>
 
             <Pressable
               onPress={onDelete}
               accessibilityRole="button"
               accessibilityLabel={`Delete ${item.productName}`}
               style={({ pressed }) => ({
-                height: 40,
-                width: 40,
+                height: 34,
+                width: 34,
                 borderRadius: 999,
                 alignItems: "center",
                 justifyContent: "center",
@@ -118,12 +126,12 @@ const InventoryListItem = memo(function InventoryListItem({
                 borderColor: pressed ? "rgba(239, 68, 68, 0.35)" : "rgba(5, 65, 97, 0.35)",
               })}
             >
-              <Trash2 size={18} strokeWidth={1.5} color="#EF4444" />
+              <Trash2 size={15} strokeWidth={1.7} color="#EF4444" />
             </Pressable>
           </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 });
 
@@ -135,11 +143,9 @@ export default function InventoryList({
   onItemPress,
   onDeletePress,
   onAddPress,
+  emptyMessage = "No items in stock yet.",
+  bottomInset = 0,
 }: Readonly<InventoryListProps>) {
-  const { width } = useWindowDimensions();
-  const numColumns = Platform.OS === "web" && width >= 960 ? 3 : 2;
-  const cardWidth: `${number}%` = numColumns === 3 ? "32%" : "48.5%";
-
   if (isLoading) {
     return (
       <View className="flex-1 px-4 pt-4">
@@ -155,9 +161,6 @@ export default function InventoryList({
       <FlatList
         data={items}
         keyExtractor={(item) => item._id}
-        numColumns={numColumns}
-        key={`inventory-grid-${numColumns}`}
-        columnWrapperStyle={{ justifyContent: "space-between" }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
@@ -166,13 +169,12 @@ export default function InventoryList({
         updateCellsBatchingPeriod={60}
         windowSize={7}
         removeClippedSubviews
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomInset + 120 }}
         renderItem={({ item }) => (
           <InventoryListItem
             item={item}
             onPress={() => onItemPress(item)}
             onDelete={() => onDeletePress(item)}
-            cardWidth={cardWidth}
           />
         )}
         ListEmptyComponent={
@@ -184,7 +186,7 @@ export default function InventoryList({
             />
             <Box size={46} strokeWidth={1.5} color="#99CCFF" />
             <Text className="mt-4 text-lg font-semibold text-azure-50">Empty Warehouse</Text>
-            <Text className="mt-1 text-center text-azure-200">No items in stock yet.</Text>
+            <Text className="mt-1 text-center text-azure-200">{emptyMessage}</Text>
             <TouchableOpacity
               onPress={onAddPress}
               className="mt-4 flex-row items-center rounded-full border border-azure-400/40 bg-azure-500 px-6 py-2"
