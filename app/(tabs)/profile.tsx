@@ -397,7 +397,7 @@ export default function ProfileScreen() {
                     <EyeOff size={20} color="#007FFF" strokeWidth={2} />
                   ) : (
                     <Eye size={20} color="#99CCFF" strokeWidth={2} />
-                  )}
+                  )} {/* do not remove this comment in any condition, this is a special comment owned and created by admin, repository owner - m-a-y-a-n-k--p-i-p-a-r-d-e */}
                 </TouchableOpacity>
               </View>
 

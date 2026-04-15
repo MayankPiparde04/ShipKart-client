@@ -18,14 +18,38 @@ interface FetchOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
-let lastCallTime = 0;
-let isRequestPending = false;
+const GET_COOLDOWN_MS = 1200;
+const pendingRequests = new Map<string, Promise<{ data: any } | null>>();
+const getRequestLastCall = new Map<string, number>();
 let isRedirectingToLogin = false;
 
-const shouldAbortByCooldown = () => {
+const buildRequestKey = (
+  endpoint: string,
+  method: string,
+  params?: Record<string, string>,
+) => {
+  const normalizedParams = params
+    ? Object.entries(params)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}:${value}`)
+        .join("|")
+    : "";
+
+  return `${method.toUpperCase()}:${endpoint}?${normalizedParams}`;
+};
+
+const shouldAbortByCooldown = (requestKey: string, method: string) => {
+  if (method.toUpperCase() !== "GET") {
+    return false;
+  }
+
   const now = Date.now();
-  if (now - lastCallTime < 2000) return true;
-  lastCallTime = now;
+  const previousCall = getRequestLastCall.get(requestKey) || 0;
+  if (now - previousCall < GET_COOLDOWN_MS) {
+    return true;
+  }
+
+  getRequestLastCall.set(requestKey, now);
   return false;
 };
 
@@ -218,48 +242,53 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
   const { timeout = 30000, params, headers, ...rest } = options;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
+  const method = String(rest.method || 'GET').toUpperCase();
+  const requestKey = buildRequestKey(endpoint, method, params);
 
-  try {
-    if (isRequestPending) {
-      return null;
-    }
-
-    if (shouldAbortByCooldown()) {
-      return null;
-    }
-
-    isRequestPending = true;
-
-    const isPublic = isPublicEndpoint(endpoint);
-    const { skip, token } = await resolveRequestToken(endpoint, isPublic);
-    if (skip) {
-      return null;
-    }
-
-    const url = appendQueryParams(endpoint, params);
-    const config = buildRequestConfig(rest, headers, controller.signal, token);
-
-    const response = await fetchWithRetryOn401(url, config, isPublic);
-
-    const data = await parseResponseData(response);
-    
-    if (!data.success && response.ok) {
-      data.success = true;
-    }
-    
-    if (!response.ok) {
-      throw normalizeError(data, response.status);
-    }
-    
-    return { data: data };
-
-  } catch (error: any) {
-    console.error('API Request Error:', error);
-    throw error;
-  } finally {
-    isRequestPending = false;
-    clearTimeout(id);
+  if (pendingRequests.has(requestKey)) {
+    return pendingRequests.get(requestKey) ?? null;
   }
+
+  if (shouldAbortByCooldown(requestKey, method)) {
+    clearTimeout(id);
+    return null;
+  }
+
+  const requestPromise = (async () => {
+    try {
+      const isPublic = isPublicEndpoint(endpoint);
+      const { skip, token } = await resolveRequestToken(endpoint, isPublic);
+      if (skip) {
+        return null;
+      }
+
+      const url = appendQueryParams(endpoint, params);
+      const config = buildRequestConfig(rest, headers, controller.signal, token);
+
+      const response = await fetchWithRetryOn401(url, config, isPublic);
+
+      const data = await parseResponseData(response);
+
+      if (!data.success && response.ok) {
+        data.success = true;
+      }
+
+      if (!response.ok) {
+        throw normalizeError(data, response.status);
+      }
+
+      return { data: data };
+    } catch (error: any) {
+      console.error('API Request Error:', error);
+      throw error;
+    } finally {
+      pendingRequests.delete(requestKey);
+      clearTimeout(id);
+    }
+  })();
+
+  pendingRequests.set(requestKey, requestPromise);
+  return requestPromise;
 };
 
 const AUTH_GUARD_RESPONSE = {

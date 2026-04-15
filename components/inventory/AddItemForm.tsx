@@ -21,6 +21,7 @@ interface AddItemFormProps {
   };
   setNewItem: (item: any) => void;
   isAdding: boolean;
+  isEditMode?: boolean;
 }
 
 export default function AddItemForm({
@@ -30,13 +31,27 @@ export default function AddItemForm({
   newItem,
   setNewItem,
   isAdding,
-}: AddItemFormProps) {
+  isEditMode = false,
+}: Readonly<AddItemFormProps>) {
   const handleChange = (key: string, value: string) => {
     setNewItem({ ...newItem, [key]: value });
   };
 
+  let submitLabel = "Add Item";
+  if (isAdding && isEditMode) {
+    submitLabel = "Updating Item...";
+  } else if (isAdding && !isEditMode) {
+    submitLabel = "Adding Item...";
+  } else if (!isAdding && isEditMode) {
+    submitLabel = "Update Item";
+  }
+
   return (
-    <FormModal visible={visible} onClose={onClose} title="Add New Item">
+    <FormModal
+      visible={visible}
+      onClose={onClose}
+      title={isEditMode ? "Update Item" : "Add New Item"}
+    >
       <View className="space-y-2">
         <FormField
           label="Product Name"
@@ -151,7 +166,7 @@ export default function AddItemForm({
             />
           )}
           <Text className="text-white font-bold text-lg">
-            {isAdding ? "Adding Item..." : "Add Item"}
+            {submitLabel}
           </Text>
         </TouchableOpacity>
       </View>

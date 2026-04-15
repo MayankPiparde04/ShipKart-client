@@ -187,8 +187,11 @@ export default function Inventory() {
   // Filters
   const filteredItems = useMemo(() => {
     const stockMatched = items.filter((item) => {
-      if (stockFilter === "out") return Number(item.quantity) <= 0;
-      if (stockFilter === "low") return Number(item.quantity) < 20;
+      if (stockFilter === "out") return Number(item.quantity) === 0;
+      if (stockFilter === "low") {
+        const qty = Number(item.quantity);
+        return qty > 0 && qty < 50;
+      }
       return true;
     });
 
@@ -198,8 +201,11 @@ export default function Inventory() {
 
   const filteredBoxes = useMemo(() => {
     const stockMatched = boxes.filter((box) => {
-      if (stockFilter === "out") return Number(box.quantity) <= 0;
-      if (stockFilter === "low") return Number(box.quantity) < 20;
+      if (stockFilter === "out") return Number(box.quantity) === 0;
+      if (stockFilter === "low") {
+        const qty = Number(box.quantity);
+        return qty > 0 && qty < 50;
+      }
       return true;
     });
 
@@ -213,6 +219,19 @@ export default function Inventory() {
     await Promise.all([fetchItems(true), fetchBoxes(true)]);
     setIsRefreshing(false);
   }, [fetchItems, fetchBoxes]);
+
+  const existingItemForDraft = useMemo(() => {
+    const draftName = newItem.productName.trim().toLowerCase();
+    if (!draftName) return null;
+
+    return (
+      items.find((item) => item.productName.trim().toLowerCase() === draftName) ||
+      null
+    );
+  }, [items, newItem.productName]);
+
+  const resolvedEditItemId = editItemId || existingItemForDraft?._id || null;
+  const isItemUpsertUpdate = Boolean(resolvedEditItemId);
 
   const handleAddItemSubmit = useCallback(async () => {
     try {
@@ -231,8 +250,8 @@ export default function Inventory() {
         brand: newItem.brand,
       };
 
-      if (editItemId) {
-        await updateItem(editItemId, itemData);
+      if (resolvedEditItemId) {
+        await updateItem(resolvedEditItemId, itemData);
         showSnackbar("Item updated", "success");
       } else {
         await addItem(itemData);
@@ -257,7 +276,7 @@ export default function Inventory() {
     } finally {
       setIsAddingItem(false);
     }
-  }, [newItem, editItemId, updateItem, addItem, showSnackbar]);
+  }, [newItem, resolvedEditItemId, updateItem, addItem, showSnackbar]);
 
   const handleAddBoxSubmit = useCallback(async () => {
     try {
@@ -279,6 +298,8 @@ export default function Inventory() {
         showSnackbar("Box added", "success");
       }
 
+      await fetchBoxes(true);
+
       setNewBox({
         box_name: "",
         length: "",
@@ -294,7 +315,7 @@ export default function Inventory() {
     } finally {
       setIsAddingBox(false);
     }
-  }, [newBox, editBoxId, updateBox, addBox, showSnackbar]);
+  }, [newBox, editBoxId, updateBox, addBox, fetchBoxes, showSnackbar]);
 
   const handleEditItem = useCallback((item: Item) => {
     setEditItemId(item._id);
@@ -537,6 +558,7 @@ export default function Inventory() {
         newItem={newItem}
         setNewItem={setNewItem}
         isAdding={isAddingItem}
+        isEditMode={isItemUpsertUpdate}
       />
 
       <AddBoxForm
@@ -546,6 +568,7 @@ export default function Inventory() {
         newBox={newBox}
         setNewBox={setNewBox}
         isAdding={isAddingBox}
+        isEditMode={Boolean(editBoxId)}
       />
 
       <FormModal

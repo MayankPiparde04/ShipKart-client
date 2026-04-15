@@ -45,7 +45,15 @@ const InventoryListItem = memo(function InventoryListItem({
   onPress: () => void;
   onDelete: () => void;
 }) {
-  const isLowStock = Number(item.quantity) < 20;
+  const quantity = Number(item.quantity);
+  const isOutOfStock = quantity === 0;
+  const isLowStock = quantity > 0 && quantity < 50;
+  let stockColorClass = "text-azure-50";
+  if (isOutOfStock) {
+    stockColorClass = "text-[#EF4444]";
+  } else if (isLowStock) {
+    stockColorClass = "text-[#F59E0B]";
+  }
 
   return (
     <TouchableOpacity
@@ -85,7 +93,7 @@ const InventoryListItem = memo(function InventoryListItem({
 
         <View className="w-14 items-end">
           <Text className="text-[10px] uppercase tracking-[0.8px] text-azure-200">Stock</Text>
-          <Text className={`mt-1 text-xl font-bold ${isLowStock ? "text-[#F87171]" : "text-azure-50"}`}>
+          <Text className={`mt-1 text-xl font-bold ${stockColorClass}`}>
             {item.quantity}
           </Text>
         </View>

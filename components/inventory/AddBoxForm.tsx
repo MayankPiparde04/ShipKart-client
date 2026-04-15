@@ -18,6 +18,7 @@ interface AddBoxFormProps {
   };
   setNewBox: (box: any) => void;
   isAdding: boolean;
+  isEditMode?: boolean;
 }
 
 export default function AddBoxForm({
@@ -27,13 +28,27 @@ export default function AddBoxForm({
   newBox,
   setNewBox,
   isAdding,
-}: AddBoxFormProps) {
+  isEditMode = false,
+}: Readonly<AddBoxFormProps>) {
   const handleChange = (key: string, value: string) => {
     setNewBox({ ...newBox, [key]: value });
   };
 
+  let submitLabel = "Add Box";
+  if (isAdding && isEditMode) {
+    submitLabel = "Updating Box...";
+  } else if (isAdding && !isEditMode) {
+    submitLabel = "Adding Box...";
+  } else if (!isAdding && isEditMode) {
+    submitLabel = "Update Box";
+  }
+
   return (
-    <FormModal visible={visible} onClose={onClose} title="Add New Box">
+    <FormModal
+      visible={visible}
+      onClose={onClose}
+      title={isEditMode ? "Update Box" : "Add New Box"}
+    >
       <View className="space-y-2">
         <FormField
           label="Box Name"
@@ -122,7 +137,7 @@ export default function AddBoxForm({
             />
           )}
           <Text className="text-white font-bold text-lg">
-            {isAdding ? "Adding Box..." : "Add Box"}
+            {submitLabel}
           </Text>
         </TouchableOpacity>
       </View>
