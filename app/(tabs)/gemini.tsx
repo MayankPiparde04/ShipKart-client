@@ -1,5 +1,6 @@
 import { useInventory } from "@/contexts/InventoryContext";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
+import { triggerSuccessHaptic } from "@/utils/haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
@@ -198,6 +199,7 @@ export default function App() {
         setIsPredicting(false);
 
         if (prediction?.success && prediction?.data?.prediction) {
+          await triggerSuccessHaptic();
           showSnackbar("Item Scanned Successfully", "success");
           router.replace({
             pathname: "/(tabs)/inventory",

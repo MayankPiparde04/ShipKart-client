@@ -2,6 +2,7 @@ import { apiService } from "@/services/api";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { Eye, EyeOff } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +23,8 @@ export default function ResetPasswordScreen() {
   const params = useLocalSearchParams<{ email?: string; otp?: string }>();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const email = useMemo(
@@ -118,12 +121,22 @@ export default function ResetPasswordScreen() {
                 <TextInput
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  secureTextEntry
+                  secureTextEntry={!showNewPassword}
                   placeholder="Minimum 8 chars + 1 special char"
                   placeholderTextColor="#99CCFF"
-                  className="h-14 px-4 text-base text-azure-50"
+                  className="h-14 pr-12 pl-4 text-base text-azure-50"
                   editable={!isLoading}
                 />
+                <TouchableOpacity
+                  className="absolute right-4 top-4"
+                  onPress={() => setShowNewPassword((current) => !current)}
+                >
+                  {showNewPassword ? (
+                    <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                  ) : (
+                    <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <Text className="mb-2 text-sm font-semibold text-azure-200">Confirm Password</Text>
@@ -131,12 +144,22 @@ export default function ResetPasswordScreen() {
                 <TextInput
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  secureTextEntry
+                  secureTextEntry={!showConfirmPassword}
                   placeholder="Re-enter new password"
                   placeholderTextColor="#99CCFF"
-                  className="h-14 px-4 text-base text-azure-50"
+                  className="h-14 pr-12 pl-4 text-base text-azure-50"
                   editable={!isLoading}
                 />
+                <TouchableOpacity
+                  className="absolute right-4 top-4"
+                  onPress={() => setShowConfirmPassword((current) => !current)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                  ) : (
+                    <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity

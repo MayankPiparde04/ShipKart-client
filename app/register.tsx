@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { Eye, EyeOff } from "lucide-react-native";
 import React, { useState, useCallback } from "react";
 import {
   ActivityIndicator,
@@ -229,11 +230,11 @@ const Register = React.memo(() => {
                     onPress={() => setShowPassword(!showPassword)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={22}
-                      color="#99CCFF"
-                    />
+                    {showPassword ? (
+                      <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                    ) : (
+                      <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>

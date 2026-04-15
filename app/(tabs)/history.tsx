@@ -2,6 +2,7 @@ import SkeletonCard from "@/components/ui/SkeletonCard";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { ShipmentTransaction, useHistory } from "@/contexts/HistoryContext";
 import { formatCurrencyInr } from "@/utils/currency";
+import { triggerSuccessHaptic } from "@/utils/haptics";
 import { generateAndSharePackingSlip } from "@/utils/packingSlip";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Text,
   TouchableOpacity,
@@ -137,6 +139,7 @@ export default function HistoryScreen() {
     setIsDeleting(true);
     try {
       await deleteTransaction(selectedTransaction._id);
+      await triggerSuccessHaptic();
       showSnackbar("History record removed from view", "success");
       setSelectedTransaction(null);
     } catch (error: any) {
@@ -224,6 +227,13 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView className="flex-1 bg-navy-950">
       <StatusBar style="light" translucent />
+      <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+        <Image
+          source={require("../../assets/images/Shipwise_logo_t.png")}
+          resizeMode="contain"
+          style={{ width: "72%", height: "72%", opacity: 0.05 }}
+        />
+      </View>
       <View className="flex-1 px-6 pt-4" style={{ paddingBottom: tabBarHeight + 8 }}>
         <Text className="text-3xl font-bold text-azure-50">Order History</Text>
         <Text className="mt-1 text-azure-200">

@@ -1,7 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Device from "expo-device";
 import { router } from "expo-router";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAuthTokens,
+} from "@/utils/tokenStorage";
 
 interface User {
   _id: string;
@@ -38,14 +44,16 @@ interface AuthContextType {
     company?: string;
     address?: string;
   }) => Promise<void>;
+  updateTokens: (accessToken: string, refreshToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Add this constant before AuthProvider
-const DAILY_DATA_STORAGE_KEY = "daily_data";
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://10.23.27.130:5000/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!API_BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is missing. Configure it in your environment file.");
+}
 
 // Helper to decode JWT and check expiry
 const isTokenExpired = (token: string | null) => {
@@ -68,8 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // const { fetchItems } = useInventory();
-  // const { fetchBoxes } = useBoxes();
 
   useEffect(() => {
     loadStoredAuth();
@@ -77,8 +83,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loadStoredAuth = async () => {
     try {
-      const storedAccessToken = await AsyncStorage.getItem("accessToken");
-      const storedRefreshToken = await AsyncStorage.getItem("refreshToken");
+      const storedAccessToken = await getAccessToken();
+      const storedRefreshToken = await getRefreshToken();
       const storedUser = await AsyncStorage.getItem("user");
 
       if (storedAccessToken && storedRefreshToken && storedUser) {
@@ -109,8 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     user: User,
   ) => {
     try {
-      await AsyncStorage.setItem("accessToken", accessToken);
-      await AsyncStorage.setItem("refreshToken", refreshToken);
+      await setAuthTokens(accessToken, refreshToken);
       await AsyncStorage.setItem("user", JSON.stringify(user));
       setAccessToken(accessToken);
       setRefreshToken(refreshToken);
@@ -214,8 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setAccessToken(data.data.accessToken);
       setRefreshToken(data.data.refreshToken);
-      await AsyncStorage.setItem("accessToken", data.data.accessToken);
-      await AsyncStorage.setItem("refreshToken", data.data.refreshToken);
+      await setAuthTokens(data.data.accessToken, data.data.refreshToken);
       return true;
     } catch (error) {
       console.error("Token refresh error:", error);
@@ -233,9 +237,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const refreshed = await refreshAuthToken();
       if (!refreshed) throw new Error("Session expired. Please log in again.");
     }
-    const token = await AsyncStorage.getItem("accessToken");
+    const token = await getAccessToken();
     const headers = {
-      ...(init.headers || {}),
+      ...(init.headers as Record<string, string> | undefined),
       Authorization: `Bearer ${token}`,
     };
     return fetch(input, { ...init, headers });
@@ -243,16 +247,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     try {
-      await AsyncStorage.multiRemove([
-        "accessToken",
-        "refreshToken",
-        "user",
-        "inventory_items",
-        "inventory_items_timestamp",
-        "inventory_boxes",
-        "inventory_boxes_timestamp",
-        DAILY_DATA_STORAGE_KEY,
-      ]);
+      await clearAuthTokens();
+      await AsyncStorage.clear();
       setAccessToken(null);
       setRefreshToken(null);
       setUser(null);
@@ -261,6 +257,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch (error) {
       console.error("Logout error:", error);
     }
+  };
+
+  const updateTokens = async (newAccessToken: string, newRefreshToken: string) => {
+    await setAuthTokens(newAccessToken, newRefreshToken);
+    setAccessToken(newAccessToken);
+    setRefreshToken(newRefreshToken);
   };
 
   const updateUserContext = async (updateData: {
@@ -291,20 +293,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const contextValue = useMemo(
+    () => ({
+      user,
+      accessToken,
+      refreshToken,
+      isLoading,
+      login,
+      register,
+      logout,
+      refreshAuthToken,
+      updateUserContext,
+      updateTokens,
+    }),
+    [
+      user,
+      accessToken,
+      refreshToken,
+      isLoading,
+      login,
+      register,
+      logout,
+      refreshAuthToken,
+      updateUserContext,
+      updateTokens,
+    ],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        accessToken,
-        refreshToken,
-        isLoading,
-        login,
-        register,
-        logout,
-        refreshAuthToken,
-        updateUserContext, // add to context
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

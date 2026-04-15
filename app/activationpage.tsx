@@ -20,6 +20,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const otpSlots = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"] as const;
 const OTP_VALIDITY_SECONDS = 5 * 60;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!API_BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is missing. Configure it in your environment file.");
+}
 
 export default function ActivationPage() {
   const router = useRouter();
@@ -68,7 +73,7 @@ export default function ActivationPage() {
 
     try {
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api"}/activation`,
+        `${API_BASE_URL}/activation`,
         {
           method: "POST",
           headers: {
@@ -107,7 +112,7 @@ export default function ActivationPage() {
 
     try {
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || "http://localhost:5000/api"}/resend-activation`,
+        `${API_BASE_URL}/resend-activation`,
         {
           method: "POST",
           headers: {

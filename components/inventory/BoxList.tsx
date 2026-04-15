@@ -1,10 +1,13 @@
 import React, { memo } from "react";
 import {
   FlatList,
+  Image,
+  Platform,
   RefreshControl,
   Pressable,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Package, PackagePlus, Trash2 } from "lucide-react-native";
@@ -23,6 +26,7 @@ interface Box {
 interface BoxListProps {
   boxes: Box[];
   isLoading: boolean;
+  isRefreshing: boolean;
   onRefresh: () => void;
   onBoxPress: (box: Box) => void;
   onDeletePress: (box: Box) => void;
@@ -33,14 +37,17 @@ const BoxListItem = memo(function BoxListItem({
   item,
   onPress,
   onDelete,
+  cardWidth,
 }: {
   item: Box;
   onPress: () => void;
   onDelete: () => void;
+  cardWidth: `${number}%`;
 }) {
   return (
     <TouchableOpacity
       className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 px-4 py-4"
+      style={{ width: cardWidth }}
       onPress={onPress}
     >
       <View className="flex-row items-center justify-between gap-4">
@@ -107,11 +114,16 @@ const BoxListItem = memo(function BoxListItem({
 export default function BoxList({
   boxes,
   isLoading,
+  isRefreshing,
   onRefresh,
   onBoxPress,
   onDeletePress,
   onAddPress,
 }: Readonly<BoxListProps>) {
+  const { width } = useWindowDimensions();
+  const numColumns = Platform.OS === "web" && width >= 960 ? 3 : 2;
+  const cardWidth: `${number}%` = numColumns === 3 ? "32%" : "48.5%";
+
   if (isLoading) {
     return (
       <View className="flex-1 px-4 pt-4">
@@ -127,26 +139,36 @@ export default function BoxList({
       <FlatList
         data={boxes}
         keyExtractor={(box) => box._id}
+        numColumns={numColumns}
+        key={`box-grid-${numColumns}`}
+        columnWrapperStyle={{ justifyContent: "space-between" }}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         updateCellsBatchingPeriod={60}
         windowSize={7}
         removeClippedSubviews
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         renderItem={({ item }) => (
           <BoxListItem
             item={item}
             onPress={() => onBoxPress(item)}
             onDelete={() => onDeletePress(item)}
+            cardWidth={cardWidth}
           />
         )}
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
-            <Package size={64} strokeWidth={1.5} color="#99CCFF" />
-            <Text className="mt-4 text-lg text-azure-200">No boxes found</Text>
+            <Image
+              source={require("../../assets/images/Shipwise_logo_t.png")}
+              style={{ width: 170, height: 78, opacity: 0.18 }}
+              resizeMode="contain"
+            />
+            <Package size={46} strokeWidth={1.5} color="#99CCFF" />
+            <Text className="mt-4 text-lg font-semibold text-azure-50">Empty Warehouse</Text>
+            <Text className="mt-1 text-center text-azure-200">No boxes available yet.</Text>
             <TouchableOpacity
               onPress={onAddPress}
               className="mt-4 flex-row items-center rounded-full border border-azure-400/40 bg-azure-500 px-6 py-2"

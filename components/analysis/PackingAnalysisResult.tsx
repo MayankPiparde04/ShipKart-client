@@ -3,6 +3,7 @@ import { useHistory } from "@/contexts/HistoryContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { apiService } from "@/services/api";
 import { formatCurrencyInr } from "@/utils/currency";
+import { triggerSuccessHaptic } from "@/utils/haptics";
 import { generateAndSharePackingSlip } from "@/utils/packingSlip";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -185,6 +186,16 @@ export default function PackingAnalysisResult({
     [result],
   );
 
+  const optimizationTip = useMemo(
+    () =>
+      result?.analytics?.optimizationTip ||
+      (result?.analytics?.recommendations || []).find((text: string) =>
+        text.startsWith("Optimization Tip:"),
+      ) ||
+      null,
+    [result],
+  );
+
   const getOrientationLabel = (orientation?: string | null) => {
     if (orientation === "H×L×B") return "Standing Upright";
     if (orientation === "L×B×H" || orientation === "L×W×H") {
@@ -301,6 +312,7 @@ export default function PackingAnalysisResult({
               response.message || `${packedQty} items packed and inventory updated.`,
               "success",
             );
+            await triggerSuccessHaptic();
             await Promise.all([fetchItems(), fetchBoxes(), fetchTransactions()]);
             clearResult();
             setTab(0);
@@ -366,6 +378,12 @@ export default function PackingAnalysisResult({
             <Text className="text-sm text-azure-200">Packing Success</Text>
           </View>
         </View>
+
+        {optimizationTip ? (
+          <View className="mb-4 rounded-card border border-azure-400/35 bg-azure-500/10 px-4 py-3">
+            <Text className="text-sm font-semibold text-azure-50">{optimizationTip}</Text>
+          </View>
+        ) : null}
 
         <View className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-5">
           <Text className="mb-3 text-xl font-bold text-azure-50">Cost Analysis</Text>

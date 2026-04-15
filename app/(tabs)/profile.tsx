@@ -3,10 +3,12 @@ import { apiService } from "@/services/api";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import { Eye, EyeOff } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   ScrollView,
   Text,
   TextInput,
@@ -19,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const LIGHT_FOREGROUND = "#EAF4FF";
 
 export default function ProfileScreen() {
-  const { user, logout, updateUserContext } = useAuth();
+  const { user, logout, updateUserContext, updateTokens } = useAuth();
   const { height } = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -31,6 +33,18 @@ export default function ProfileScreen() {
     phone: user?.phone || "",
     company: user?.company || "",
     address: user?.address || "",
+  });
+  const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    next: false,
+    confirm: false,
   });
 
   // Update editedUser when user data changes
@@ -104,6 +118,59 @@ export default function ProfileScreen() {
     if (!phone) return "";
     if (phone.length <= 4) return "****";
     return phone.slice(0, 2) + "****" + phone.slice(-2);
+  };
+
+  const handleChangePassword = async () => {
+    if (isChangingPassword) return;
+
+    const { currentPassword, newPassword, confirmNewPassword } = passwordForm;
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      Alert.alert("Missing fields", "Please fill all password fields.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      Alert.alert("Mismatch", "New password and confirm password must match.");
+      return;
+    }
+
+    if (newPassword.length < 8 || !/^(?=.*[^A-Za-z0-9]).{8,}$/.test(newPassword)) {
+      Alert.alert(
+        "Weak password",
+        "Password must be at least 8 characters and include a special character.",
+      );
+      return;
+    }
+
+    try {
+      setIsChangingPassword(true);
+      const response = await apiService.changePassword(passwordForm);
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to change password");
+      }
+
+      if (response?.data?.accessToken && response?.data?.refreshToken) {
+        await updateTokens(response.data.accessToken, response.data.refreshToken);
+      }
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
+      });
+      setIsChangePasswordVisible(false);
+
+      Alert.alert(
+        "Password Changed",
+        "Your password was updated successfully. Other active sessions have been signed out.",
+      );
+    } catch (error: any) {
+      Alert.alert("Change password failed", error?.message || "Please try again.");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   // Render profile fields - either as text or input
@@ -244,6 +311,20 @@ export default function ProfileScreen() {
 
           {/* Logout Button */}
           <TouchableOpacity
+            className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-4"
+            onPress={() => setIsChangePasswordVisible(true)}
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <Ionicons name="key-outline" size={20} color="#99CCFF" />
+                <Text className="ml-2 font-semibold text-azure-50">Change Password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#99CCFF" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Logout Button */}
+          <TouchableOpacity
             className="mb-6 rounded-card border border-navy-800/30 bg-navy-900 p-4"
             onPress={logout}
           >
@@ -260,6 +341,113 @@ export default function ProfileScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <Modal visible={isChangePasswordVisible} animationType="slide" transparent>
+        <View className="flex-1 items-center justify-end bg-black/60 px-5 py-6">
+          <View className="w-full rounded-3xl border border-navy-800/40 bg-navy-900 p-6">
+            <Text className="text-xl font-bold text-azure-50">Change Password</Text>
+            <Text className="mt-1 text-sm text-azure-200">
+              Update your password securely without OTP.
+            </Text>
+
+            <View className="mt-5 gap-3">
+              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+                <TextInput
+                  className="h-12 px-4 pr-12 text-azure-50"
+                  placeholder="Current Password"
+                  placeholderTextColor="#99CCFF"
+                  secureTextEntry={!showPassword.current}
+                  value={passwordForm.currentPassword}
+                  onChangeText={(text) =>
+                    setPasswordForm((prev) => ({ ...prev, currentPassword: text }))
+                  }
+                />
+                <TouchableOpacity
+                  className="absolute right-4 top-3"
+                  onPress={() =>
+                    setShowPassword((prev) => ({ ...prev, current: !prev.current }))
+                  }
+                >
+                  {showPassword.current ? (
+                    <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                  ) : (
+                    <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+                <TextInput
+                  className="h-12 px-4 pr-12 text-azure-50"
+                  placeholder="New Password"
+                  placeholderTextColor="#99CCFF"
+                  secureTextEntry={!showPassword.next}
+                  value={passwordForm.newPassword}
+                  onChangeText={(text) =>
+                    setPasswordForm((prev) => ({ ...prev, newPassword: text }))
+                  }
+                />
+                <TouchableOpacity
+                  className="absolute right-4 top-3"
+                  onPress={() =>
+                    setShowPassword((prev) => ({ ...prev, next: !prev.next }))
+                  }
+                >
+                  {showPassword.next ? (
+                    <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                  ) : (
+                    <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+                <TextInput
+                  className="h-12 px-4 pr-12 text-azure-50"
+                  placeholder="Confirm New Password"
+                  placeholderTextColor="#99CCFF"
+                  secureTextEntry={!showPassword.confirm}
+                  value={passwordForm.confirmNewPassword}
+                  onChangeText={(text) =>
+                    setPasswordForm((prev) => ({ ...prev, confirmNewPassword: text }))
+                  }
+                />
+                <TouchableOpacity
+                  className="absolute right-4 top-3"
+                  onPress={() =>
+                    setShowPassword((prev) => ({ ...prev, confirm: !prev.confirm }))
+                  }
+                >
+                  {showPassword.confirm ? (
+                    <EyeOff size={20} color="#007FFF" strokeWidth={2} />
+                  ) : (
+                    <Eye size={20} color="#99CCFF" strokeWidth={2} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View className="mt-6 flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 rounded-xl border border-navy-700 bg-navy-950 py-3"
+                onPress={() => setIsChangePasswordVisible(false)}
+                disabled={isChangingPassword}
+              >
+                <Text className="text-center font-semibold text-azure-200">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 rounded-xl border border-azure-400/40 bg-azure-500 py-3"
+                onPress={handleChangePassword}
+                disabled={isChangingPassword}
+              >
+                <Text className="text-center font-bold text-white">
+                  {isChangingPassword ? "Updating..." : "Update Password"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

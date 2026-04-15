@@ -20,18 +20,13 @@ import { useFonts } from "expo-font";
 import { router, Stack, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { LogBox, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 // Disable Reanimated strict mode warnings caused by NativeWind v4 internal style animations
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
-
-// Ignore third-party deprecation warnings spamming the console
-LogBox.ignoreLogs([
-  "SafeAreaView has been deprecated and will be removed in a future release",
-]);
 
 const industrialTheme: Theme = {
   dark: true,

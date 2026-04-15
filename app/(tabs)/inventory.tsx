@@ -6,6 +6,8 @@ import FormModal from "@/components/ui/FormModal";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
+import { triggerSuccessHaptic } from "@/utils/haptics";
+import { rankByFuzzySearch } from "@/utils/search";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
@@ -23,6 +25,7 @@ interface Item {
   dimensions: { length: number; breadth: number; height: number };
   category?: string;
   brand?: string;
+  imageUrl?: string;
 }
 
 interface Box {
@@ -33,12 +36,16 @@ interface Box {
   height: number;
   quantity: number;
   max_weight: number; // in kgs
+  category?: string;
+  brand?: string;
 }
 
 export default function Inventory() {
   const { showSnackbar } = useSnackbar();
+  type StockFilter = "all" | "low" | "out";
   // Tab state
   const [activeTab, setActiveTab] = useState<"items" | "boxes">("items");
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
 
   // Modal state
   // Modal state
@@ -135,21 +142,25 @@ export default function Inventory() {
   }, [params.prefill]);
 
   // Filters
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) =>
-        item.productName.toLowerCase().includes(searchText.toLowerCase()),
-      ),
-    [items, searchText],
-  );
+  const filteredItems = useMemo(() => {
+    const stockMatched = items.filter((item) => {
+      if (stockFilter === "out") return Number(item.quantity) <= 0;
+      if (stockFilter === "low") return Number(item.quantity) > 0 && Number(item.quantity) < 10;
+      return true;
+    });
 
-  const filteredBoxes = useMemo(
-    () =>
-      boxes.filter((box) =>
-        box.box_name.toLowerCase().includes(searchText.toLowerCase()),
-      ),
-    [boxes, searchText],
-  );
+    return rankByFuzzySearch(stockMatched, searchText, (item) => item.productName);
+  }, [items, searchText, stockFilter]);
+
+  const filteredBoxes = useMemo(() => {
+    const stockMatched = boxes.filter((box) => {
+      if (stockFilter === "out") return Number(box.quantity) <= 0;
+      if (stockFilter === "low") return Number(box.quantity) > 0 && Number(box.quantity) < 10;
+      return true;
+    });
+
+    return rankByFuzzySearch(stockMatched, searchText, (box) => box.box_name);
+  }, [boxes, searchText, stockFilter]);
 
   // Handlers
   const onRefresh = useCallback(async () => {
@@ -286,9 +297,11 @@ export default function Inventory() {
     try {
       if (pendingDelete.kind === "item") {
         await removeItem(pendingDelete.item._id);
+        await triggerSuccessHaptic();
         showSnackbar("Item removed from inventory", "success");
       } else {
         await removeBox(pendingDelete.box._id);
+        await triggerSuccessHaptic();
         showSnackbar("Box removed from inventory", "success");
       }
       setPendingDelete(null);
@@ -347,7 +360,9 @@ export default function Inventory() {
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
             placeholder={
-              activeTab === "items" ? "Search items..." : "Search boxes..."
+              activeTab === "items"
+                ? "Search name, brand, category..."
+                : "Search box name, brand, category..."
             }
             placeholderTextColor="#9CA3AF"
             className="ml-2 flex-1 text-azure-50"
@@ -355,6 +370,27 @@ export default function Inventory() {
             value={searchText}
             onChangeText={setSearchText}
           />
+        </View>
+
+        <View className="mt-2 flex-row gap-2">
+          {[
+            { key: "all", label: "All" },
+            { key: "low", label: "Low Stock" },
+            { key: "out", label: "Out of Stock" },
+          ].map((entry) => {
+            const selected = stockFilter === entry.key;
+            return (
+              <TouchableOpacity
+                key={entry.key}
+                className={`rounded-full border px-4 py-2 ${selected ? "border-azure-400/50 bg-azure-500/20" : "border-navy-800/30 bg-navy-900"}`}
+                onPress={() => setStockFilter(entry.key as StockFilter)}
+              >
+                <Text className={`text-xs font-semibold ${selected ? "text-azure-50" : "text-azure-200"}`}>
+                  {entry.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -389,6 +425,7 @@ export default function Inventory() {
           <BoxList
             boxes={filteredBoxes}
             isLoading={isLoadingBoxes}
+            isRefreshing={isRefreshing}
             onRefresh={onRefresh}
             onBoxPress={handleEditBox}
             onDeletePress={handleDeleteBox}

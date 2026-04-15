@@ -1,21 +1,47 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from 'react-native';
+import { router } from 'expo-router';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAuthTokens,
+} from "@/utils/tokenStorage";
 
-// Determine base URL dynamically or from environment
-// Since you are using an Android Studio AVD (Pixel_8_Pro), 10.0.2.2 is the required loopback alias.
-const fallbackUrl = Platform.OS === 'android' ? 'http://10.0.2.2:5000/api' : 'http://localhost:5000/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
-// CRITICAL SECURITY FIX: Never use local fallbacks if the app is bundled for production execution.
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? fallbackUrl : '');
-
-if (!BASE_URL && !__DEV__) {
-  console.error("CRITICAL ERROR: EXPO_PUBLIC_API_URL is entirely missing in a production application build.");
+if (!BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is missing. Configure it in your .env files.");
 }
 
 interface FetchOptions extends RequestInit {
   timeout?: number;
   params?: Record<string, string>;
 }
+
+const PUBLIC_ENDPOINTS = new Set([
+  '/login',
+  '/register',
+  '/activation',
+  '/resend-activation',
+  '/forgot-password',
+  '/verify-forgot-password-otp',
+  '/reset-password',
+  '/refresh-token',
+]);
+
+const isPublicEndpoint = (endpoint: string) => {
+  const path = endpoint.split('?')[0];
+  return PUBLIC_ENDPOINTS.has(path);
+};
+
+const redirectToLogin = async () => {
+  await clearAuthTokens();
+  try {
+    router.replace('/login');
+  } catch {
+    // Ignore navigation failures before the root navigator mounts.
+  }
+};
 
 const createApiError = (message: string, status?: number, data?: any) => {
   const error = new Error(message) as Error & { status?: number; data?: any };
@@ -50,6 +76,7 @@ const buildRequestConfig = (
     ...rest,
     headers: mergedHeaders,
     signal: rest.signal || signal,
+    credentials: Platform.OS === 'web' ? 'include' : rest.credentials,
   };
 
   if (rest.body instanceof FormData) {
@@ -68,7 +95,7 @@ const refreshExpiredRequest = async (
   config: RequestInit & { headers: HeadersInit & Record<string, string> },
 ) => {
   try {
-    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    const refreshToken = await getRefreshToken();
     if (!refreshToken) return null;
 
     const refreshResponse = await fetch(`${BASE_URL}/refresh-token`, {
@@ -83,17 +110,34 @@ const refreshExpiredRequest = async (
     if (!data.success) return null;
 
     const { accessToken, refreshToken: newRefreshToken } = data.data;
-    await AsyncStorage.setItem("accessToken", accessToken);
-    if (newRefreshToken) await AsyncStorage.setItem("refreshToken", newRefreshToken);
+    await setAuthTokens(accessToken, newRefreshToken || refreshToken);
 
     const newHeaders = { ...config.headers, Authorization: `Bearer ${accessToken}` };
     return fetch(url, { ...config, headers: newHeaders });
   } catch (refreshError) {
     console.error("Token refresh failed:", refreshError);
-    await AsyncStorage.removeItem("accessToken");
-    await AsyncStorage.removeItem("refreshToken");
+    await clearAuthTokens();
     return null;
   }
+};
+
+const refreshAccessToken = async () => {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) return null;
+
+  const refreshResponse = await fetch(`${BASE_URL}/refresh-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!refreshResponse.ok) return null;
+
+  const data = await parseResponseData(refreshResponse);
+  if (!data?.success || !data?.data?.accessToken) return null;
+
+  await setAuthTokens(data.data.accessToken, data.data.refreshToken || refreshToken);
+  return data.data.accessToken as string;
 };
 
 const normalizeError = (data: any, status: number) => {
@@ -117,15 +161,27 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
   const id = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const token = await AsyncStorage.getItem("accessToken");
+    const isPublic = isPublicEndpoint(endpoint);
+    let token = await getAccessToken();
+
+    if (!token && !isPublic) {
+      token = await refreshAccessToken();
+      if (!token) {
+        await redirectToLogin();
+        throw createApiError('Access token is required', 401);
+      }
+    }
+
     const url = appendQueryParams(endpoint, params);
     const config = buildRequestConfig(rest, headers, controller.signal, token);
 
     let response = await fetch(url, config);
-    if (response.status === 401) {
+    if (response.status === 401 && !isPublic) {
       const retriedResponse = await refreshExpiredRequest(url, config);
       if (retriedResponse) {
         response = retriedResponse;
+      } else {
+        await redirectToLogin();
       }
     }
 
@@ -142,9 +198,10 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
     return { data: data };
 
   } catch (error: any) {
-    clearTimeout(id);
     console.error('API Request Error:', error);
     throw error;
+  } finally {
+    clearTimeout(id);
   }
 };
 
@@ -224,7 +281,10 @@ export const apiService = {
 
   updateBox: async (id: string, update: any) => {
     try {
-      const response = await api.put(`/updatebox`, update);
+      const response = await api.put(`/updatebox`, {
+        id,
+        ...update,
+      });
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -380,6 +440,19 @@ export const apiService = {
   updateUserProfile: async (updateData: any) => {
     try {
       const response = await api.put('/user/update', updateData);
+      return response.data;
+    } catch (error: any) {
+      return { success: false, message: error.message };
+    }
+  },
+
+  changePassword: async (payload: {
+    currentPassword: string;
+    newPassword: string;
+    confirmNewPassword: string;
+  }) => {
+    try {
+      const response = await api.post('/change-password', payload);
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };

@@ -38,6 +38,13 @@ const BoxContext = createContext<BoxContextType | undefined>(undefined);
 
 const BOXES_STORAGE_KEY = "inventory_boxes";
 
+const sortBoxesByName = (boxesList: Box[]) =>
+  [...boxesList].sort((left, right) =>
+    left.box_name.localeCompare(right.box_name, undefined, {
+      sensitivity: "base",
+    }),
+  );
+
 export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -52,7 +59,7 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const storedBoxes = await AsyncStorage.getItem(BOXES_STORAGE_KEY);
       if (storedBoxes) {
-        setBoxes(JSON.parse(storedBoxes));
+        setBoxes(sortBoxesByName(JSON.parse(storedBoxes)));
       } else {
         setBoxes([]);
       }
@@ -84,7 +91,8 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
       const response: GetBoxesResponse = await apiService.getBoxes({
         page: 1,
         limit: 100,
-        // Add sort if needed, e.g. sortBy: 'box_name', sortOrder: 'asc'
+        sortBy: "box_name",
+        sortOrder: "asc",
       });
 
       if (response.success && response.data?.boxes) {
@@ -98,8 +106,9 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
           quantity: box.quantity,
           max_weight: box.max_weight,
         }));
-        setBoxes(cleanedBoxes);
-        await saveBoxesToStorage(cleanedBoxes);
+        const sortedBoxes = sortBoxesByName(cleanedBoxes);
+        setBoxes(sortedBoxes);
+        await saveBoxesToStorage(sortedBoxes);
       } else if (response.data === null) {
         // Handle 304 responses - keep existing data
         // Data not modified, so no need to update state
@@ -116,7 +125,7 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     const response = await apiService.addBox(box);
     if (response.success) {
       if (response.data?.box) {
-        const newBoxes = [...boxes, response.data.box];
+        const newBoxes = sortBoxesByName([...boxes, response.data.box]);
         setBoxes(newBoxes);
         await saveBoxesToStorage(newBoxes);
       } else {
@@ -136,10 +145,12 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
       additionalQuantity,
     );
     if (response.success) {
-      const updatedBoxes = boxes.map((box) =>
-        box.box_name === box_name
-          ? { ...box, quantity: box.quantity + additionalQuantity }
-          : box,
+      const updatedBoxes = sortBoxesByName(
+        boxes.map((box) =>
+          box.box_name === box_name
+            ? { ...box, quantity: box.quantity + additionalQuantity }
+            : box,
+        ),
       );
       setBoxes(updatedBoxes);
       await saveBoxesToStorage(updatedBoxes);
@@ -151,7 +162,9 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeBox = useCallback(async (id: string) => {
     const response = await apiService.deleteBox(id);
     if (response.success) {
-      const filteredBoxes = boxes.filter((box) => box._id !== id);
+      const filteredBoxes = sortBoxesByName(
+        boxes.filter((box) => box._id !== id),
+      );
       setBoxes(filteredBoxes);
       await saveBoxesToStorage(filteredBoxes);
     } else {

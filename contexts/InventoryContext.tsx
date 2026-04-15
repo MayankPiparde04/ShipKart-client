@@ -64,6 +64,13 @@ const ITEMS_STORAGE_KEY = "inventory_items";
 const DAILY_DATA_STORAGE_KEY = "daily_data";
 const DAILY_SOLD_STORAGE_KEY = "daily_sold";
 
+const sortItemsByName = (itemsList: Item[]) =>
+  [...itemsList].sort((left, right) =>
+    left.productName.localeCompare(right.productName, undefined, {
+      sensitivity: "base",
+    }),
+  );
+
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -82,7 +89,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const storedItems = await AsyncStorage.getItem(ITEMS_STORAGE_KEY);
       if (storedItems) {
-        setItems(JSON.parse(storedItems));
+        setItems(sortItemsByName(JSON.parse(storedItems)));
       } else {
         setItems([]);
       }
@@ -174,8 +181,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
           category: item.category,
           brand: item.brand,
         }));
-        setItems(cleanedItems);
-        await saveItemsToStorage(cleanedItems);
+        const sortedItems = sortItemsByName(cleanedItems);
+        setItems(sortedItems);
+        await saveItemsToStorage(sortedItems);
 
         // Handle dailyData if present
         if (Array.isArray(response.data.dailyData)) {
@@ -210,7 +218,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     const response = await apiService.addOrUpdateItem(item);
     if (response.success) {
       if (response.data?.item) {
-        const newItems = [...items, response.data.item];
+        const newItems = sortItemsByName([...items, response.data.item]);
         setItems(newItems);
         await saveItemsToStorage(newItems);
       } else {
@@ -240,7 +248,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
   const removeItem = async (id: string) => {
     const response = await apiService.deleteItem(id);
     if (response.success) {
-      const filteredItems = items.filter((item) => item._id !== id);
+      const filteredItems = sortItemsByName(
+        items.filter((item) => item._id !== id),
+      );
       setItems(filteredItems);
       await saveItemsToStorage(filteredItems);
     } else {

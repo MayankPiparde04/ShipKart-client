@@ -1,5 +1,7 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system/legacy";
+import { Asset } from "expo-asset";
 import { formatCurrencyInr } from "./currency";
 
 type CartonLike = {
@@ -40,7 +42,27 @@ type PackingSlipInput = {
   shippingRatePerKg?: number;
   fragileHandlingFee?: number;
   cartonBaseCost?: number;
+  logoDataUri?: string;
 };
+
+let cachedLogoDataUri: string | null = null;
+
+async function getShipWiseLogoDataUri() {
+  if (cachedLogoDataUri) return cachedLogoDataUri;
+
+  const logoAsset = Asset.fromModule(require("../assets/images/Shipwise_logo_t.png"));
+  if (!logoAsset.localUri) {
+    await logoAsset.downloadAsync();
+  }
+
+  const logoUri = logoAsset.localUri || logoAsset.uri;
+  const base64 = await FileSystem.readAsStringAsync(logoUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  cachedLogoDataUri = `data:image/png;base64,${base64}`;
+  return cachedLogoDataUri;
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -91,6 +113,7 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
     0,
     Number.MAX_SAFE_INTEGER,
   );
+  const logoDataUri = input.logoDataUri || "";
 
   type GroupedInstruction = {
     boxType: string;
@@ -164,12 +187,17 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 96px;
-            font-weight: 800;
-            color: rgba(125, 139, 154, 0.05);
+            width: 60vw;
+            max-width: 460px;
+            opacity: 0.05;
             z-index: 0;
             pointer-events: none;
-            letter-spacing: 4px;
+          }
+
+          .watermark img {
+            width: 100%;
+            height: auto;
+            display: block;
           }
 
           .content {
@@ -184,9 +212,24 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: relative;
+            z-index: 3;
           }
 
           .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .logo img {
+            width: 130px;
+            height: auto;
+            display: block;
+            image-rendering: auto;
+          }
+
+          .logo-text {
             font-size: 24px;
             font-weight: 800;
             color: #0E4D7A;
@@ -290,10 +333,23 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
         </style>
       </head>
       <body>
-        <div class="watermark">ShipWise</div>
+        <div class="watermark">
+          ${
+            logoDataUri
+              ? `<img src="${logoDataUri}" alt="ShipWise watermark" />`
+              : ""
+          }
+        </div>
         <div class="content">
           <div class="header">
-            <div class="logo">ShipWise</div>
+            <div class="logo">
+              ${
+                logoDataUri
+                  ? `<img src="${logoDataUri}" alt="ShipWise" />`
+                  : ""
+              }
+              <div class="logo-text">ShipWise</div>
+            </div>
             <div class="doc-title">PACKING SLIP</div>
           </div>
           <div class="meta">Generated: ${escapeHtml(timestamp)}</div>
@@ -356,7 +412,11 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
 }
 
 export async function generateAndSharePackingSlip(input: PackingSlipInput) {
-  const html = buildPackingSlipHtml(input);
+  const logoDataUri = input.logoDataUri || (await getShipWiseLogoDataUri());
+  const html = buildPackingSlipHtml({
+    ...input,
+    logoDataUri,
+  });
   const file = await Print.printToFileAsync({ html });
 
   const canShare = await Sharing.isAvailableAsync();
