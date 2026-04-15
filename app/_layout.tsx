@@ -14,6 +14,7 @@ import AppErrorBoundary from "@/components/ui/AppErrorBoundary";
 import StartupSplash from "@/components/ui/StartupSplash";
 import { SnackbarProvider, useSnackbar } from "@/components/ui/SnackbarProvider";
 import NetInfo from "@react-native-community/netinfo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ThemeProvider, Theme } from "@react-navigation/native";
 import { useFonts } from "expo-font";
@@ -77,6 +78,25 @@ function RootLayoutNav() {
 
     return () => unsubscribe();
   }, []);
+
+  // Check AsyncStorage for token at startup and redirect if missing
+  useEffect(() => {
+    const checkAuthToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem("accessToken");
+        if (!token && !isLoading && loaded) {
+          // Token is missing, redirect to login
+          router.replace("/login");
+        }
+      } catch (error) {
+        console.error("Error checking auth token:", error);
+      }
+    };
+
+    if (!isLoading && loaded) {
+      checkAuthToken();
+    }
+  }, [isLoading, loaded]);
 
   useEffect(() => {
     const previous = previousConnectionRef.current;

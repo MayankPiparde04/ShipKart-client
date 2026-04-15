@@ -150,32 +150,41 @@ export default function PackingAnalysisResult({
   }, [visibleCartons]);
 
   const productWeightGrams = Number(result?.productInfo?.weight || selectedItem?.weight || 0);
-  const totalWeightKg = (packedQty * productWeightGrams) / 1000;
   const serverEstimated = result?.summary?.estimatedCost;
   const estimatedBreakdown = {
-    cartonBaseCost: Number(
-      serverEstimated?.breakdown?.cartonBaseCost ??
+    usedBoxPriceTotal: Number(
+      serverEstimated?.breakdown?.usedBoxPriceTotal ??
+        serverEstimated?.breakdown?.cartonBaseCost ??
         visibleCartons.reduce(
           (sum: number, entry: any) =>
             sum + Number(entry.carton?.cartonDetails?.cost || 0),
           0,
         ),
     ),
-    shippingRatePerKg: Number(serverEstimated?.breakdown?.shippingRatePerKg ?? 18),
-    shippingCostByWeight: Number(
-      serverEstimated?.breakdown?.shippingCostByWeight ?? totalWeightKg * 18,
+    handlingFeeTotal: Number(
+      serverEstimated?.breakdown?.handlingFeeTotal ??
+        visibleCartons.reduce(
+          (sum: number, entry: any) => {
+            const volume = Number(entry.carton?.cartonDetails?.volume || 0);
+            if (volume <= 18000) return sum + 20;
+            if (volume <= 60000) return sum + 35;
+            return sum + 50;
+          },
+          0,
+        ),
     ),
-    fragileHandlingFee: Number(
-      serverEstimated?.breakdown?.fragileHandlingFee ??
+    fragileHandlingSurcharge: Number(
+      serverEstimated?.breakdown?.fragileHandlingSurcharge ??
+        serverEstimated?.breakdown?.fragileHandlingFee ??
         (result?.productInfo?.isFragile ? 35 : 0),
     ),
   };
 
   const estimatedCost = Number(
     serverEstimated?.total ??
-      estimatedBreakdown.cartonBaseCost +
-        estimatedBreakdown.shippingCostByWeight +
-        estimatedBreakdown.fragileHandlingFee,
+      estimatedBreakdown.usedBoxPriceTotal +
+        estimatedBreakdown.handlingFeeTotal +
+        estimatedBreakdown.fragileHandlingSurcharge,
   );
 
   const smallerBoxSuggestion = useMemo(
@@ -223,7 +232,7 @@ export default function PackingAnalysisResult({
   const showCostBreakdown = () => {
     Alert.alert(
       "Estimated Cost Breakdown",
-      `Carton Base Cost: ${formatCurrencyInr(estimatedBreakdown.cartonBaseCost)}\nShipping (Rate x Total Weight): ${formatCurrencyInr(estimatedBreakdown.shippingCostByWeight)}\nRate: ${formatCurrencyInr(estimatedBreakdown.shippingRatePerKg)} per kg\nFragile Handling Fee: ${formatCurrencyInr(estimatedBreakdown.fragileHandlingFee)}\n\nEstimated Cost: ${formatCurrencyInr(estimatedCost)}`,
+      `Used Box Price Total: ${formatCurrencyInr(estimatedBreakdown.usedBoxPriceTotal)}\nHandling Fee Total: ${formatCurrencyInr(estimatedBreakdown.handlingFeeTotal)}\nFragile Handling Surcharge: ${formatCurrencyInr(estimatedBreakdown.fragileHandlingSurcharge)}\n\nEstimated Cost: ${formatCurrencyInr(estimatedCost)}`,
       [{ text: "OK" }],
     );
   };
@@ -240,9 +249,9 @@ export default function PackingAnalysisResult({
         packedQty,
         cartons,
         productWeightGrams,
-        shippingRatePerKg: estimatedBreakdown.shippingRatePerKg,
-        fragileHandlingFee: estimatedBreakdown.fragileHandlingFee,
-        cartonBaseCost: estimatedBreakdown.cartonBaseCost,
+        shippingRatePerKg: 0,
+        fragileHandlingFee: estimatedBreakdown.fragileHandlingSurcharge,
+        cartonBaseCost: estimatedBreakdown.usedBoxPriceTotal,
       });
 
       Alert.alert("PDF Created", `Packing slip saved at:\n${fileUri}`);
@@ -282,10 +291,15 @@ export default function PackingAnalysisResult({
                   estimatedCost: {
                     total: Number(estimatedCost || 0),
                     breakdown: {
-                      cartonBaseCost: Number(estimatedBreakdown.cartonBaseCost || 0),
-                      shippingRatePerKg: Number(estimatedBreakdown.shippingRatePerKg || 0),
-                      shippingCostByWeight: Number(estimatedBreakdown.shippingCostByWeight || 0),
-                      fragileHandlingFee: Number(estimatedBreakdown.fragileHandlingFee || 0),
+                      cartonBaseCost: Number(estimatedBreakdown.usedBoxPriceTotal || 0),
+                      shippingRatePerKg: 0,
+                      shippingCostByWeight: 0,
+                      fragileHandlingFee: Number(estimatedBreakdown.fragileHandlingSurcharge || 0),
+                      usedBoxPriceTotal: Number(estimatedBreakdown.usedBoxPriceTotal || 0),
+                      handlingFeeTotal: Number(estimatedBreakdown.handlingFeeTotal || 0),
+                      fragileHandlingSurcharge: Number(
+                        estimatedBreakdown.fragileHandlingSurcharge || 0,
+                      ),
                     },
                   },
                   totalItemsRequested: Number(requestedQty || packedQty),

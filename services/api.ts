@@ -164,11 +164,13 @@ const customFetch = async (endpoint: string, options: FetchOptions = {}) => {
     const isPublic = isPublicEndpoint(endpoint);
     let token = await getAccessToken();
 
+    // Guard: If no token and endpoint is protected, redirect to login
     if (!token && !isPublic) {
       token = await refreshAccessToken();
       if (!token) {
         await redirectToLogin();
-        throw createApiError('Access token is required', 401);
+        // Return a 401-like error response instead of throwing
+        throw createApiError('Access token required. Redirecting to login.', 401);
       }
     }
 
