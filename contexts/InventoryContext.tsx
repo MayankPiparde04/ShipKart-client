@@ -155,7 +155,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchItems = useCallback(async () => {
+  const fetchItems = useCallback(async (refresh = false) => {
     setIsLoading(true);
     try {
       const response = await apiService.getItems({
@@ -163,7 +163,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
         limit: 100,
         sortBy: "productName",
         sortOrder: "asc",
-      });
+      }, refresh);
 
       if (response.success && response.data?.items) {
         // Clean items to match Item interface
@@ -240,7 +240,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({
       dimensions: itemUpdate.dimensions || { length: 0, breadth: 0, height: 0 },
     });
     if (response.success) {
-      await fetchItems(); // Refresh items and dailyData for dashboard/graph
+      await fetchItems(true); // Refresh items and dailyData for dashboard/graph
     } else {
       throw new Error(response.message || "Failed to update item");
     }

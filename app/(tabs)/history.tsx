@@ -2,7 +2,6 @@ import SkeletonCard from "@/components/ui/SkeletonCard";
 import { useSnackbar } from "@/components/ui/SnackbarProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShipmentTransaction, useHistory } from "@/contexts/HistoryContext";
-import { formatCurrencyInr } from "@/utils/currency";
 import { triggerSuccessHaptic } from "@/utils/haptics";
 import { generateAndSharePackingSlip } from "@/utils/packingSlip";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -47,10 +46,6 @@ function TransactionCard({
   const displayTime = formatTransactionTime(
     item.createdAt || item.timestamp || item.packedAt,
   );
-  const estimatedCost =
-    item.metadata?.summary?.estimatedCost?.total ||
-    item.metadata?.summary?.estimatedCost?.breakdown?.cartonBaseCost ||
-    null;
 
   return (
     <View className="mb-3 rounded-card border border-navy-800/30 bg-navy-900 p-4">
@@ -95,12 +90,6 @@ function TransactionCard({
         <View className="flex-row justify-between">
           <Text className="text-azure-200">Cartons Used</Text>
           <Text className="font-semibold text-azure-50">{cartonsCount}</Text>
-        </View>
-        <View className="flex-row justify-between">
-          <Text className="text-azure-200">Estimated Cost</Text>
-          <Text className="font-semibold text-azure-50">
-            {estimatedCost === null ? "N/A" : formatCurrencyInr(estimatedCost)}
-          </Text>
         </View>
       </View>
 
@@ -201,12 +190,10 @@ export default function HistoryScreen() {
 
     try {
       setIsGeneratingPdf(true);
-      showSnackbar("Generating PDF...", "info", 1800);
+      showSnackbar("Generating Packing Slip...", "info", 1800);
 
       const productInfo = (metadata as any)?.productInfo || {};
-      const estimatedCostBreakdown = (metadata as any)?.summary?.estimatedCost?.breakdown || {};
-
-      await generateAndSharePackingSlip({
+      const saveResult = await generateAndSharePackingSlip({
         generatedAt: transaction.packedAt ? new Date(transaction.packedAt) : new Date(),
         productName: productInfo?.name || transaction.productName,
         productDimensions: productInfo?.dimensions || "N/A",
@@ -215,15 +202,18 @@ export default function HistoryScreen() {
         packedQty: Number(transaction.packedQty || 0),
         cartons,
         productWeightGrams: Number(productInfo?.weight || 0),
-        shippingRatePerKg: Number(estimatedCostBreakdown?.shippingRatePerKg || 18),
-        fragileHandlingFee: Number(estimatedCostBreakdown?.fragileHandlingFee || 0),
-        cartonBaseCost: Number(estimatedCostBreakdown?.cartonBaseCost || 0),
       });
 
-      showSnackbar("Packing slip generated successfully", "success");
+      let successMessage = "Packing slip generated successfully";
+      if (saveResult.sharedWithSystemDialog) {
+        successMessage = "Invoice exported successfully.";
+      }
+
+      showSnackbar(successMessage, "success");
     } catch (error: any) {
-      showSnackbar(error?.message || "Failed to generate PDF", "error");
-      Alert.alert("Export Error", error?.message || "Failed to generate PDF");
+      const message = error?.message || "Failed to generate PDF";
+      showSnackbar(message, "error");
+      Alert.alert("Export Error", message);
     } finally {
       setIsGeneratingPdf(false);
     }

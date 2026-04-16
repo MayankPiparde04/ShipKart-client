@@ -58,34 +58,44 @@ const BoxListItem = memo(function BoxListItem({
       onPress={onPress}
       activeOpacity={0.86}
     >
-      <View className="flex-row items-center gap-3">
+      <View className="flex-row items-start gap-3">
         <View className="h-16 w-16 items-center justify-center rounded-lg border border-navy-800/40 bg-[#001933]">
           <Package size={24} strokeWidth={1.5} color="#99CCFF" />
         </View>
 
-        <View className="min-w-0 flex-1">
-          <Text className="text-base font-bold text-azure-50" numberOfLines={1}>
-            {item.box_name}
-          </Text>
-          <Text className="mt-0.5 text-sm text-azure-200" numberOfLines={1}>
-            Shipping box
-          </Text>
-          <View className="mt-2 self-start rounded-md border border-[#054161]/55 bg-[#001933] px-2 py-1">
+        <View className="min-w-0 flex-1 gap-2">
+          <View className="flex-row items-center justify-between gap-2">
+            <Text className="flex-1 text-base font-bold text-azure-50" numberOfLines={1}>
+              {item.box_name}
+            </Text>
+            <View className="rounded-full border border-azure-400/35 bg-azure-500/10 px-2 py-1">
+              <Text className="text-[11px] font-semibold text-azure-200">Box</Text>
+            </View>
+          </View>
+
+          <View className="self-start rounded-md border border-[#054161]/55 bg-[#001933] px-2 py-1">
             <Text className="text-[11px] text-azure-200">
               {item.length}x{item.breadth}x{item.height} cm
             </Text>
           </View>
+
+          <View className="flex-row items-center gap-4">
+            <View className="flex-row items-center gap-1">
+              <Text className="text-[11px] uppercase tracking-[0.8px] text-azure-200">
+                Count
+              </Text>
+              <Text className={`text-sm font-bold ${stockColorClass}`}>{item.quantity}</Text>
+            </View>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-[11px] uppercase tracking-[0.8px] text-azure-200">
+                Weight
+              </Text>
+              <Text className="text-sm font-semibold text-azure-50">{item.max_weight} kg</Text>
+            </View>
+          </View>
         </View>
 
-        <View className="w-14 items-end">
-          <Text className="text-[10px] uppercase tracking-[0.8px] text-azure-200">Stock</Text>
-          <Text className={`mt-1 text-xl font-bold ${stockColorClass}`}>
-            {item.quantity}
-          </Text>
-        </View>
-
-        <View className="ml-1 w-16 items-end self-stretch justify-between">
-          <Text className="text-xs font-semibold text-azure-200">Max {item.max_weight}kg</Text>
+        <View className="ml-1 items-end gap-2 self-stretch justify-between">
           <View className="flex-row gap-2">
             <Pressable
               onPress={onPress}
@@ -140,6 +150,8 @@ export default function BoxList({
   emptyMessage = "No boxes available yet.",
   bottomInset = 0,
 }: Readonly<BoxListProps>) {
+  const safeBoxes = Array.isArray(boxes) ? boxes : [];
+
   if (isLoading) {
     return (
       <View className="flex-1 px-4 pt-4">
@@ -153,7 +165,7 @@ export default function BoxList({
   return (
     <View className="flex-1">
       <FlatList
-        data={boxes}
+        data={safeBoxes}
         keyExtractor={(box) => box._id}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />

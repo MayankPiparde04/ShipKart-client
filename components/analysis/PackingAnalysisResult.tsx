@@ -1,13 +1,11 @@
 import { useBoxes } from "@/contexts/BoxContext";
-import { useHistory } from "@/contexts/HistoryContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { apiService } from "@/services/api";
-import { formatCurrencyInr } from "@/utils/currency";
 import { triggerSuccessHaptic } from "@/utils/haptics";
 import { generateAndSharePackingSlip } from "@/utils/packingSlip";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -40,6 +38,178 @@ function toFixed2(value: number) {
   return numeric.toFixed(2);
 }
 
+function getCartonId(carton: any) {
+  return (
+    carton?.cartonDetails?.id ||
+    carton?.cartonId ||
+    carton?.boxId ||
+    carton?.carton?._id ||
+    ""
+  );
+}
+
+function toPositiveNumber(value: any) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function resolveOrientationDimensions(orientation: any) {
+  if (Array.isArray(orientation?.dims) && orientation.dims.length >= 3) {
+    return {
+      length: toPositiveNumber(orientation.dims[0]),
+      width: toPositiveNumber(orientation.dims[1]),
+      height: toPositiveNumber(orientation.dims[2]),
+    };
+  }
+
+  return {
+    length: 0,
+    width: 0,
+    height: 0,
+  };
+}
+
+function getCartonDimensions(carton: any, masterBox?: any) {
+  const direct = carton?.cartonDetails?.dimensions || carton?.box?.dimensions;
+  const cartonEntity = carton?.carton;
+  const length =
+    toPositiveNumber(carton?.boxLength) ||
+    toPositiveNumber(direct?.length) ||
+    toPositiveNumber(carton?.cartonDetails?.length) ||
+    toPositiveNumber(carton?.cartonDetails?.boxLength) ||
+    toPositiveNumber(cartonEntity?.length) ||
+    toPositiveNumber(cartonEntity?.boxLength) ||
+    toPositiveNumber(carton?.length) ||
+    toPositiveNumber(masterBox?.length);
+  const width =
+    toPositiveNumber(carton?.boxWidth) ||
+    toPositiveNumber(direct?.width) ||
+    toPositiveNumber(direct?.breadth) ||
+    toPositiveNumber(carton?.cartonDetails?.width) ||
+    toPositiveNumber(carton?.cartonDetails?.breadth) ||
+    toPositiveNumber(cartonEntity?.width) ||
+    toPositiveNumber(cartonEntity?.breadth) ||
+    toPositiveNumber(carton?.width) ||
+    toPositiveNumber(carton?.breadth) ||
+    toPositiveNumber(masterBox?.breadth);
+  const height =
+    toPositiveNumber(carton?.boxHeight) ||
+    toPositiveNumber(direct?.height) ||
+    toPositiveNumber(carton?.cartonDetails?.height) ||
+    toPositiveNumber(cartonEntity?.height) ||
+    toPositiveNumber(carton?.height) ||
+    toPositiveNumber(masterBox?.height);
+
+  return {
+    length,
+    width,
+    height,
+  };
+}
+
+function getCartonVolumeCm3(carton: any, masterBox?: any) {
+  const explicitVolume =
+    toPositiveNumber(carton?.boxVolume) ||
+    toPositiveNumber(carton?.cartonDetails?.volume) ||
+    toPositiveNumber(carton?.carton?.volume);
+  if (explicitVolume > 0) return explicitVolume;
+
+  const dimensions = getCartonDimensions(carton, masterBox);
+  return Math.max(dimensions.length * dimensions.width * dimensions.height, 0);
+}
+
+function getCartonName(carton: any, masterBox?: any) {
+  return (
+    carton?.boxName ||
+    carton?.carton?.name ||
+    carton?.cartonDetails?.name ||
+    carton?.cartonName ||
+    carton?.cartonType ||
+    masterBox?.box_name ||
+    "Box"
+  );
+}
+
+function getUsedDimensions(carton: any, fullDimensions: { length: number; width: number; height: number }, productDimensions?: { length: number; breadth: number; height: number }) {
+  const fromOrientation = carton?.orientationDetails?.dimensionsUsed;
+  if (fromOrientation) {
+    return {
+      length: toPositiveNumber(fromOrientation.length),
+      width: toPositiveNumber(fromOrientation.width ?? fromOrientation.breadth),
+      height: toPositiveNumber(fromOrientation.height),
+    };
+  }
+
+  const packedItems = Array.isArray(carton?.layout?.packedItems) ? carton.layout.packedItems : [];
+  if (packedItems.length > 0) {
+    let maxLength = 0;
+    let maxWidth = 0;
+    let maxHeight = 0;
+
+    for (const packed of packedItems) {
+      const position = packed?.position || {};
+      const dimensions = packed?.dimensions || {};
+      maxLength = Math.max(maxLength, Number(position.x || 0) + Number(dimensions.length || 0));
+      maxWidth = Math.max(
+        maxWidth,
+        Number(position.y || 0) + Number(dimensions.width ?? dimensions.breadth ?? 0),
+      );
+      maxHeight = Math.max(maxHeight, Number(position.z || 0) + Number(dimensions.height || 0));
+    }
+
+    if (maxLength > 0 && maxWidth > 0 && maxHeight > 0) {
+      return {
+        length: maxLength,
+        width: maxWidth,
+        height: maxHeight,
+      };
+    }
+  }
+
+  const arrangement = carton?.layout?.arrangement;
+  const orientationDimensions = resolveOrientationDimensions(carton?.orientation);
+  if (arrangement && (orientationDimensions.length > 0 || productDimensions)) {
+    const baseLength = orientationDimensions.length || toPositiveNumber(productDimensions?.length);
+    const baseWidth = orientationDimensions.width || toPositiveNumber(productDimensions?.breadth);
+    const baseHeight = orientationDimensions.height || toPositiveNumber(productDimensions?.height);
+
+    const arrangedLength = toPositiveNumber(arrangement?.lengthwise) * baseLength;
+    const arrangedWidth = toPositiveNumber(arrangement?.breadthwise) * baseWidth;
+    const arrangedHeight = toPositiveNumber(arrangement?.layers) * baseHeight;
+
+    if (arrangedLength > 0 && arrangedWidth > 0 && arrangedHeight > 0) {
+      return {
+        length: arrangedLength,
+        width: arrangedWidth,
+        height: arrangedHeight,
+      };
+    }
+  }
+
+  return {
+    length: fullDimensions.length,
+    width: fullDimensions.width,
+    height: fullDimensions.height,
+  };
+}
+
+function getDimensionsUsedLabel(
+  carton: any,
+  fullDimensions: { length: number; width: number; height: number },
+  productDimensions?: { length: number; breadth: number; height: number },
+) {
+  const used = getUsedDimensions(carton, fullDimensions, productDimensions);
+
+  if (used.length <= 0 || used.width <= 0 || used.height <= 0) {
+    console.warn("[PackingAnalysis] Missing dimensionsUsed in packing result", {
+      cartonId: getCartonId(carton),
+      cartonName: carton?.boxName || carton?.cartonName || carton?.cartonDetails?.name,
+    });
+  }
+
+  return `${toFixed2(used.length)} x ${toFixed2(used.width)} x ${toFixed2(used.height)} used of ${toFixed2(fullDimensions.length)} x ${toFixed2(fullDimensions.width)} x ${toFixed2(fullDimensions.height)} cm`;
+}
+
 export default function PackingAnalysisResult({
   loading,
   error,
@@ -52,18 +222,57 @@ export default function PackingAnalysisResult({
 }: Readonly<PackingAnalysisResultProps>) {
   const { showSnackbar } = useSnackbar();
   const { fetchItems } = useInventory();
-  const { fetchBoxes } = useBoxes();
-  const { fetchTransactions } = useHistory();
+  const { boxes, fetchBoxes } = useBoxes();
 
   const [isCartonModalVisible, setIsCartonModalVisible] = useState(false);
   const [isSlipModalVisible, setIsSlipModalVisible] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
+  const boxLookupById = useMemo(
+    () =>
+      new Map(
+        (boxes || []).map((box: any) => [String(box?._id || ""), box]),
+      ),
+    [boxes],
+  );
+
+  const boxLookupByName = useMemo(
+    () =>
+      new Map(
+        (boxes || []).map((box: any) => [String(box?.box_name || "").toLowerCase(), box]),
+      ),
+    [boxes],
+  );
+
+  const productDimensionsFallback = useMemo(
+    () => ({
+      length: Number(selectedItem?.dimensions?.length || 0),
+      breadth: Number(selectedItem?.dimensions?.breadth || 0),
+      height: Number(selectedItem?.dimensions?.height || 0),
+    }),
+    [selectedItem],
+  );
+
+  const resolveMasterBox = useCallback((carton: any) => {
+    const byId = boxLookupById.get(String(getCartonId(carton) || ""));
+    if (byId) return byId;
+    const byName = boxLookupByName.get(
+      String(
+        carton?.boxName ||
+          carton?.cartonDetails?.name ||
+          carton?.cartonName ||
+          carton?.carton?.name ||
+          "",
+      ).toLowerCase(),
+    );
+    return byName;
+  }, [boxLookupById, boxLookupByName]);
+
   const cartonEntries = useMemo(
     () =>
       (result?.packingResults || []).map((carton: any, index: number) => ({
         carton,
-        key: `${carton?.cartonDetails?.id ?? carton?.cartonId ?? "carton"}-${index}`,
+        key: `${getCartonId(carton) || "box"}-${index}`,
       })),
     [result],
   );
@@ -84,116 +293,57 @@ export default function PackingAnalysisResult({
   const cartonsUsed = visibleCartons.length;
   const visiblePackingSuccess =
     requestedQty > 0 ? clamp((packedQty / requestedQty) * 100, 0, 100) : 0;
-  const qualityScore = clamp(
-    Number(result?.analytics?.packingQuality?.overallScore || 0),
-    0,
-    100,
-  );
 
-  const overallVolumeEfficiency = clamp(
-    Number(result?.summary?.overallVolumeEfficiency || 0),
-    0,
-    100,
-  );
-  const efficiencyDisplay = toFixed2(overallVolumeEfficiency);
-
-  let efficiencyClassName = "text-azure-50";
-  if (overallVolumeEfficiency > 90) {
-    efficiencyClassName = "text-[#00F6FF]";
-  } else if (overallVolumeEfficiency < 50) {
-    efficiencyClassName = "text-amber-400";
-  }
+  const productWeightGrams = Number(result?.productInfo?.weight || selectedItem?.weight || 0);
 
   const visibleCartonTypeBreakdown = useMemo(() => {
     const grouped = new Map<
       string,
       {
+        key: string;
         cartonType: string;
+        dimensionsLabel: string;
+        volumeCm3: number;
         count: number;
         totalItems: number;
+        totalWeightKg: number;
         totalCost: number;
-        avgEfficiency: number;
       }
     >();
 
     visibleCartons.forEach((entry: any) => {
       const carton = entry.carton;
-      const cartonType =
-        carton?.cartonDetails?.name || carton?.cartonType || "Carton";
-      const key = carton?.cartonDetails?.id || cartonType;
+      const masterBox = resolveMasterBox(carton);
+      const cartonType = getCartonName(carton, masterBox);
+      const dimensions = getCartonDimensions(carton, masterBox);
+      const volumeCm3 = getCartonVolumeCm3(carton, masterBox);
+      const dimensionsLabel = `${toFixed2(dimensions.length)} x ${toFixed2(dimensions.width)} x ${toFixed2(dimensions.height)} cm`;
+      const key = getCartonId(carton) || cartonType;
       const previous = grouped.get(key) || {
+        key,
         cartonType,
+        dimensionsLabel,
+        volumeCm3,
         count: 0,
         totalItems: 0,
+        totalWeightKg: 0,
         totalCost: 0,
-        avgEfficiency: 0,
       };
 
-      const cartonVolume = Number(carton?.cartonDetails?.volume || 0);
-      const wasteSpace = Number(carton?.packingMetrics?.wasteSpace || 0);
-      const packedVolume = Math.max(cartonVolume - wasteSpace, 0);
-      const efficiency = cartonVolume > 0 ? (packedVolume / cartonVolume) * 100 : 0;
+      const packedItems = Number(carton?.itemsPacked || 0);
+      const cartonWeightKg = (productWeightGrams * packedItems) / 1000;
 
       grouped.set(key, {
         ...previous,
         count: previous.count + 1,
-        totalItems: previous.totalItems + Number(carton?.itemsPacked || 0),
+        totalItems: previous.totalItems + packedItems,
+        totalWeightKg: previous.totalWeightKg + cartonWeightKg,
         totalCost: previous.totalCost + Number(carton?.cost?.total || 0),
-        avgEfficiency: previous.avgEfficiency + efficiency,
       });
     });
 
-    return Array.from(grouped.values()).map((item) => ({
-      ...item,
-      avgEfficiency: item.count > 0 ? item.avgEfficiency / item.count : 0,
-    }));
-  }, [visibleCartons]);
-
-  const productWeightGrams = Number(result?.productInfo?.weight || selectedItem?.weight || 0);
-  const serverEstimated = result?.summary?.estimatedCost;
-  const estimatedBreakdown = {
-    usedBoxPriceTotal: Number(
-      serverEstimated?.breakdown?.usedBoxPriceTotal ??
-        serverEstimated?.breakdown?.cartonBaseCost ??
-        visibleCartons.reduce(
-          (sum: number, entry: any) =>
-            sum + Number(entry.carton?.cartonDetails?.cost || 0),
-          0,
-        ),
-    ),
-    handlingFeeTotal: Number(
-      serverEstimated?.breakdown?.handlingFeeTotal ??
-        visibleCartons.reduce(
-          (sum: number, entry: any) => {
-            const volume = Number(entry.carton?.cartonDetails?.volume || 0);
-            if (volume <= 18000) return sum + 20;
-            if (volume <= 60000) return sum + 35;
-            return sum + 50;
-          },
-          0,
-        ),
-    ),
-    fragileHandlingSurcharge: Number(
-      serverEstimated?.breakdown?.fragileHandlingSurcharge ??
-        serverEstimated?.breakdown?.fragileHandlingFee ??
-        (result?.productInfo?.isFragile ? 35 : 0),
-    ),
-  };
-
-  const estimatedCost = Number(
-    serverEstimated?.total ??
-      estimatedBreakdown.usedBoxPriceTotal +
-        estimatedBreakdown.handlingFeeTotal +
-        estimatedBreakdown.fragileHandlingSurcharge,
-  );
-
-  const smallerBoxSuggestion = useMemo(
-    () =>
-      (result?.analytics?.recommendations || []).find((text: string) =>
-        text.toLowerCase().includes("smaller box"),
-      ),
-    [result],
-  );
+    return Array.from(grouped.values());
+  }, [productWeightGrams, visibleCartons, resolveMasterBox]);
 
   const optimizationTip = useMemo(
     () =>
@@ -205,7 +355,10 @@ export default function PackingAnalysisResult({
     [result],
   );
 
-  const getOrientationLabel = (orientation?: string | null) => {
+  const getOrientationLabel = (orientation?: any) => {
+    if (typeof orientation === "object" && orientation?.name) {
+      return String(orientation.name);
+    }
     if (orientation === "H×L×B") return "Standing Upright";
     if (orientation === "L×B×H" || orientation === "L×W×H") {
       return "Flat on Base";
@@ -215,33 +368,27 @@ export default function PackingAnalysisResult({
 
   const buildCartonsUsedPayload = () =>
     visibleCartons.map((entry: any) => ({
-      cartonId: entry.carton?.cartonDetails?.id ?? entry.carton?.cartonId,
-      cartonName:
-        entry.carton?.cartonDetails?.name ?? entry.carton?.cartonName ?? "Carton",
+      cartonId: getCartonId(entry.carton),
+      cartonName: getCartonName(entry.carton, resolveMasterBox(entry.carton)),
       itemsPacked: entry.carton?.itemsPacked || 0,
       orientation: entry.carton?.orientation || null,
-      dimensionsUsed: entry.carton?.orientationDetails?.dimensionsUsed
-        ? {
-            length: entry.carton.orientationDetails.dimensionsUsed.length ?? null,
-            breadth: entry.carton.orientationDetails.dimensionsUsed.breadth ?? null,
-            height: entry.carton.orientationDetails.dimensionsUsed.height ?? null,
-          }
-        : null,
+      dimensionsUsed: (() => {
+        const fullDimensions = getCartonDimensions(entry.carton, resolveMasterBox(entry.carton));
+        const used = getUsedDimensions(entry.carton, fullDimensions, productDimensionsFallback);
+        return {
+          length: used.length || null,
+          breadth: used.width || null,
+          height: used.height || null,
+        };
+      })(),
     }));
-
-  const showCostBreakdown = () => {
-    Alert.alert(
-      "Estimated Cost Breakdown",
-      `Used Box Price Total: ${formatCurrencyInr(estimatedBreakdown.usedBoxPriceTotal)}\nHandling Fee Total: ${formatCurrencyInr(estimatedBreakdown.handlingFeeTotal)}\nFragile Handling Surcharge: ${formatCurrencyInr(estimatedBreakdown.fragileHandlingSurcharge)}\n\nEstimated Cost: ${formatCurrencyInr(estimatedCost)}`,
-      [{ text: "OK" }],
-    );
-  };
 
   const handleDownloadPdf = async () => {
     try {
       setIsGeneratingPdf(true);
+      showSnackbar("Generating Packing Slip...", "info", 1800);
       const cartons = visibleCartons.map((entry: any) => entry.carton);
-      const fileUri = await generateAndSharePackingSlip({
+      const saveResult = await generateAndSharePackingSlip({
         productName: result.productInfo?.name || selectedItem?.productName,
         productDimensions: result.productInfo?.dimensions,
         isFragile: result.productInfo?.isFragile,
@@ -249,18 +396,19 @@ export default function PackingAnalysisResult({
         packedQty,
         cartons,
         productWeightGrams,
-        shippingRatePerKg: 0,
-        fragileHandlingFee: estimatedBreakdown.fragileHandlingSurcharge,
-        cartonBaseCost: estimatedBreakdown.usedBoxPriceTotal,
       });
 
-      Alert.alert("PDF Created", `Packing slip saved at:\n${fileUri}`);
+      Alert.alert(
+        "PDF Created",
+        `Invoice exported successfully.\n${saveResult.fileName}`,
+      );
 
-      showSnackbar("Packing slip generated successfully", "success");
+      showSnackbar("Invoice exported successfully.", "success");
       setIsSlipModalVisible(false);
     } catch (pdfError: any) {
-      showSnackbar(pdfError?.message || "Failed to generate PDF", "error");
-      Alert.alert("Export Error", pdfError?.message || "Failed to generate PDF");
+      const message = pdfError?.message || "Failed to generate PDF";
+      showSnackbar(message, "error");
+      Alert.alert("Export Error", message);
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -282,26 +430,14 @@ export default function PackingAnalysisResult({
               packingMetadata: {
                 productInfo: {
                   name: result?.productInfo?.name || selectedItem?.productName,
-                  dimensions: result?.productInfo?.dimensions || "N/A",
+                  dimensions:
+                    result?.productInfo?.dimensions ||
+                    `${toFixed2(productDimensionsFallback.length)} x ${toFixed2(productDimensionsFallback.breadth)} x ${toFixed2(productDimensionsFallback.height)} cm`,
                   isFragile: !!result?.productInfo?.isFragile,
                   weight: Number(productWeightGrams || 0),
                   requestedQuantity: Number(requestedQty || packedQty),
                 },
                 summary: {
-                  estimatedCost: {
-                    total: Number(estimatedCost || 0),
-                    breakdown: {
-                      cartonBaseCost: Number(estimatedBreakdown.usedBoxPriceTotal || 0),
-                      shippingRatePerKg: 0,
-                      shippingCostByWeight: 0,
-                      fragileHandlingFee: Number(estimatedBreakdown.fragileHandlingSurcharge || 0),
-                      usedBoxPriceTotal: Number(estimatedBreakdown.usedBoxPriceTotal || 0),
-                      handlingFeeTotal: Number(estimatedBreakdown.handlingFeeTotal || 0),
-                      fragileHandlingSurcharge: Number(
-                        estimatedBreakdown.fragileHandlingSurcharge || 0,
-                      ),
-                    },
-                  },
                   totalItemsRequested: Number(requestedQty || packedQty),
                 },
                 packingResults: cartonsUsedPayload.map((carton: any) => ({
@@ -322,12 +458,9 @@ export default function PackingAnalysisResult({
               throw new Error(response.message || "Failed to pack items");
             }
 
-            showSnackbar(
-              response.message || `${packedQty} items packed and inventory updated.`,
-              "success",
-            );
+            showSnackbar(response.message || `${packedQty} items packed and inventory updated.`, "success");
             await triggerSuccessHaptic();
-            await Promise.all([fetchItems(), fetchBoxes(), fetchTransactions()]);
+            await Promise.all([fetchItems(), fetchBoxes()]);
             clearResult();
             setTab(0);
             setSelectedItem(null);
@@ -400,19 +533,6 @@ export default function PackingAnalysisResult({
         ) : null}
 
         <View className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-5">
-          <Text className="mb-3 text-xl font-bold text-azure-50">Cost Analysis</Text>
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1">
-              <Text className="text-azure-200">Estimated Cost</Text>
-              <TouchableOpacity onPress={showCostBreakdown}>
-                <Ionicons name="information-circle-outline" size={16} color="#99CCFF" />
-              </TouchableOpacity>
-            </View>
-            <Text className="font-bold text-[#00F6FF]">{formatCurrencyInr(estimatedCost)}</Text>
-          </View>
-        </View>
-
-        <View className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-5">
           <Text className="mb-3 text-xl font-bold text-azure-50">Product Information</Text>
           <View className="space-y-2">
             <View className="flex-row justify-between">
@@ -458,72 +578,26 @@ export default function PackingAnalysisResult({
           </View>
         </View>
 
-        <View className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-5">
-          <Text className="mb-3 text-xl font-bold text-azure-50">Efficiency Analysis</Text>
-          <View className="space-y-3">
-            <View>
-              <View className="mb-1 flex-row justify-between">
-                <Text className="text-azure-200">Volume Efficiency</Text>
-                <Text className={`font-medium ${efficiencyClassName}`}>{efficiencyDisplay}%</Text>
-              </View>
-              <View
-                style={{
-                  backgroundColor: "rgba(5, 65, 97, 0.35)",
-                  height: 8,
-                  borderRadius: 4,
-                }}
-              >
-                <View
-                  style={{
-                    backgroundColor: "#007FFF",
-                    height: 8,
-                    borderRadius: 4,
-                    width: `${overallVolumeEfficiency}%`,
-                  }}
-                />
-              </View>
-            </View>
-
-            <View>
-              <View className="mb-1 flex-row justify-between">
-                <Text className="text-azure-200">Packing Quality Score</Text>
-                <Text className="font-medium text-azure-50">{toFixed2(qualityScore)}/100</Text>
-              </View>
-              <View
-                style={{
-                  backgroundColor: "rgba(5, 65, 97, 0.35)",
-                  height: 8,
-                  borderRadius: 4,
-                }}
-              >
-                <View
-                  style={{
-                    backgroundColor: "#00F6FF",
-                    height: 8,
-                    borderRadius: 4,
-                    width: `${qualityScore}%`,
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-          {smallerBoxSuggestion ? (
-            <View className="mt-3 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2">
-              <Text className="text-xs font-semibold text-amber-200">{smallerBoxSuggestion}</Text>
-            </View>
-          ) : null}
-        </View>
-
         {visibleCartonTypeBreakdown.map((carton: any, index: number) => (
           <View
-            key={`${carton?.cartonType ?? "carton"}-${index}`}
+            key={`${carton?.key ?? carton?.cartonType ?? "carton"}-${index}`}
             className="mb-4 rounded-card border border-navy-800/30 bg-navy-900 p-5"
           >
-            <Text className="mb-3 text-xl font-bold text-azure-50">Carton Details #{index + 1}</Text>
+            <Text className="mb-3 text-xl font-bold text-azure-50">
+              {carton.cartonType} ({carton.count} carton{carton.count > 1 ? "s" : ""})
+            </Text>
             <View className="space-y-2">
               <View className="flex-row justify-between">
-                <Text className="text-azure-200">Carton Type</Text>
+                <Text className="text-azure-200">Name</Text>
                 <Text className="font-medium text-azure-50">{carton.cartonType}</Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-azure-200">Dimensions</Text>
+                <Text className="font-medium text-azure-50">{carton.dimensionsLabel}</Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-azure-200">Volume</Text>
+                <Text className="font-medium text-azure-50">{toFixed2(carton.volumeCm3)} cm³</Text>
               </View>
               <View className="flex-row justify-between">
                 <Text className="text-azure-200">Count</Text>
@@ -534,8 +608,8 @@ export default function PackingAnalysisResult({
                 <Text className="font-medium text-azure-50">{Math.floor(carton.totalItems / carton.count)}</Text>
               </View>
               <View className="flex-row justify-between">
-                <Text className="text-azure-200">Efficiency</Text>
-                <Text className="font-medium text-azure-50">{toFixed2(clamp(carton.avgEfficiency, 0, 100))}%</Text>
+                <Text className="text-azure-200">Total Weight</Text>
+                <Text className="font-medium text-azure-50">{toFixed2(carton.totalWeightKg)} kg</Text>
               </View>
             </View>
           </View>
@@ -547,19 +621,29 @@ export default function PackingAnalysisResult({
             <View className="flex-row flex-wrap justify-between">
               {previewCartons.map((entry: { key: string; carton: any }, index: number) => {
                 const carton = entry.carton;
+                const masterBox = resolveMasterBox(carton);
+                const fullDimensions = getCartonDimensions(carton, masterBox);
+                const cartonName = getCartonName(carton, masterBox);
+                const cartonWeightKg =
+                  (productWeightGrams * Number(carton?.itemsPacked || 0)) / 1000;
                 return (
                   <View
                     key={entry.key}
                     className="mb-3 rounded-xl border border-navy-800/30 bg-navy-950 p-3"
                     style={{ width: "31.5%" }}
                   >
-                    <Text className="text-xs font-semibold text-azure-200">Carton #{index + 1}</Text>
+                    <View className="flex-row items-center justify-between gap-2">
+                      <Text className="flex-1 text-xs font-semibold text-azure-200" numberOfLines={1}>
+                        {cartonName} (#{index + 1})
+                      </Text>
+                    </View>
                     <Text className="mt-1 text-sm font-bold text-azure-50" numberOfLines={1}>
-                      {carton.cartonDetails?.name || "Carton"}
+                      {getOrientationLabel(carton.orientation)}
                     </Text>
                     <Text className="mt-1 text-xs text-azure-200">Items: {carton.itemsPacked}</Text>
+                    <Text className="text-xs text-azure-200">Weight: {toFixed2(cartonWeightKg)} kg</Text>
                     <Text className="text-xs text-[#00F6FF]" numberOfLines={2}>
-                      {getOrientationLabel(carton.orientation)}
+                      Dimensions Used: {getDimensionsUsedLabel(carton, fullDimensions, productDimensionsFallback)}
                     </Text>
                   </View>
                 );
@@ -616,19 +700,32 @@ export default function PackingAnalysisResult({
               <View className="flex-row flex-wrap justify-between">
                 {visibleCartons.map((entry: { key: string; carton: any }, index: number) => {
                   const carton = entry.carton;
+                  const masterBox = resolveMasterBox(carton);
+                  const fullDimensions = getCartonDimensions(carton, masterBox);
+                  const cartonName = getCartonName(carton, masterBox);
+                  const cartonWeightKg =
+                    (productWeightGrams * Number(carton?.itemsPacked || 0)) / 1000;
                   return (
                     <View
                       key={`${entry.key}-modal`}
                       className="mb-3 rounded-xl border border-navy-800/30 bg-navy-950 p-3"
                       style={{ width: "31.5%" }}
                     >
-                      <Text className="text-xs font-semibold text-azure-200">Carton #{index + 1}</Text>
+                      <View className="flex-row items-center justify-between gap-2">
+                        <Text className="flex-1 text-xs font-semibold text-azure-200" numberOfLines={1}>
+                          {cartonName} (#{index + 1})
+                        </Text>
+                      </View>
                       <Text className="mt-1 text-sm font-bold text-azure-50" numberOfLines={1}>
-                        {carton.cartonDetails?.name || "Carton"}
+                        {getOrientationLabel(carton.orientation)}
                       </Text>
                       <Text className="mt-1 text-xs text-azure-200">Items: {carton.itemsPacked}</Text>
+                      <Text className="text-xs text-azure-200">Weight: {toFixed2(cartonWeightKg)} kg</Text>
+                      <Text className="text-xs text-azure-200" numberOfLines={2}>
+                        Dimensions Used: {getDimensionsUsedLabel(carton, fullDimensions, productDimensionsFallback)}
+                      </Text>
                       <Text className="text-xs text-[#00F6FF]" numberOfLines={2}>
-                        {getOrientationLabel(carton.orientation)}
+                        Orientation: {getOrientationLabel(carton.orientation)}
                       </Text>
                     </View>
                   );

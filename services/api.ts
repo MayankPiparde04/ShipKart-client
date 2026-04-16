@@ -104,6 +104,17 @@ const appendQueryParams = (endpoint: string, params?: Record<string, string>) =>
   return `${BASE_URL}${endpoint}?${searchParams.toString()}`;
 };
 
+const addRefreshBuster = (params?: Record<string, string>, refresh?: boolean) => {
+  if (!refresh) return params;
+
+  const nextParams = params ?? {};
+
+  return {
+    ...nextParams,
+    __refresh: String(Date.now()),
+  };
+};
+
 const buildRequestConfig = (
   rest: RequestInit,
   headers: HeadersInit | undefined,
@@ -323,9 +334,11 @@ const api = {
 
 // API Service object to match InventoryContext expectations
 export const apiService = {
-  getItems: async (params: any) => {
+  getItems: async (params: any, refresh = false) => {
     try {
-      const response = await api.get('/getitemdata', { params });
+      const response = await api.get('/getitemdata', {
+        params: addRefreshBuster(params, refresh),
+      });
       return response.data;
     } catch (error: any) {
       console.error('getItems error:', error);
@@ -360,9 +373,11 @@ export const apiService = {
     }
   },
 
-  getBoxes: async (params: any) => {
+  getBoxes: async (params: any, refresh = false) => {
     try {
-      const response = await api.get('/getboxes', { params });
+      const response = await api.get('/boxes', {
+        params: addRefreshBuster(params, refresh),
+      });
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -493,9 +508,13 @@ export const apiService = {
     }
   },
 
-  optimalPacking2: async (products: any) => {
+  optimalAnalysis: async (payload: {
+    selectedItems: any[];
+    availableBoxes: any[];
+    options?: Record<string, any>;
+  }) => {
     try {
-      const response = await api.post('/optimal-packing2', { products });
+      const response = await api.post('/optimal-analysis', payload);
       return response.data;
     } catch (error: any) {
       return { success: false, message: error.message };
@@ -581,8 +600,8 @@ export const apiService = {
 export const endpoints = {
   auth: { login: '/login', register: '/register', refreshToken: '/refresh-token' },
   ai: { predictDimensions: '/ai/predict-dimensions', history: '/ai/prediction-history' },
-  packing: { optimal: '/optimal-packing2', enhanced: '/enhanced-packing' },
-  inventory: { items: '/items', boxes: '/boxes' }
+  packing: { optimal: '/optimal-analysis', enhanced: '/enhanced-packing' },
+  inventory: { items: '/getitemdata', boxes: '/boxes' }
 };
 
 export default api;

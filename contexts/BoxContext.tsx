@@ -77,15 +77,20 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const fetchBoxes = useCallback(async () => {
+  const fetchBoxes = useCallback(async (refresh = false) => {
     setIsLoading(true);
     try {
       type GetBoxesResponse = {
         success: boolean;
         message?: string;
-        data: {
-          boxes: any[]; // Accept any fields from API
-        } | null;
+        data:
+          | {
+              boxes?: any[];
+              data?: {
+                boxes?: any[];
+              };
+            }
+          | null;
       };
 
       const response: GetBoxesResponse = await apiService.getBoxes({
@@ -93,11 +98,14 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
         limit: 100,
         sortBy: "box_name",
         sortOrder: "asc",
-      });
+      }, refresh);
 
-      if (response.success && response.data?.boxes) {
+      const rawBoxes =
+        response?.data?.boxes || response?.data?.data?.boxes || [];
+
+      if (response.success && Array.isArray(rawBoxes)) {
         // Only keep fields defined in Box interface
-        const cleanedBoxes = response.data.boxes.map((box: any) => ({
+        const cleanedBoxes = rawBoxes.map((box: any) => ({
           _id: box._id,
           box_name: box.box_name,
           length: box.length,
@@ -184,7 +192,7 @@ export const BoxProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateBox = useCallback(async (id: string, boxUpdate: Partial<Box>) => {
     const response = await apiService.updateBox(id, boxUpdate);
     if (response.success) {
-      await fetchBoxes();
+      await fetchBoxes(true);
     } else {
       throw new Error(response.message || "Failed to update box");
     }

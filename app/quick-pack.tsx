@@ -104,7 +104,19 @@ export default function QuickPack() {
       }));
 
       // Call API using the centralized axios instance
-      const response = await api.post("/enhanced-packing", { products });
+      const boxesResponse = await api.get("/boxes");
+      const availableBoxes = boxesResponse?.data?.data?.boxes || [];
+
+      if (!Array.isArray(availableBoxes) || availableBoxes.length === 0) {
+        Alert.alert("Error", "No boxes available in inventory.");
+        setLoading(false);
+        return;
+      }
+
+      const response = await api.post("/optimal-analysis", {
+        selectedItems: products,
+        availableBoxes,
+      });
 
       if (response.data?.success) {
         setResult(response.data.data);
@@ -215,7 +227,7 @@ export default function QuickPack() {
               {summary.packingRate}%
             </Text>
             <Text className="text-sm text-azure-200">
-              Efficiency
+              Packing Success
             </Text>
           </View>
         </View>
@@ -251,19 +263,6 @@ export default function QuickPack() {
             <Text className="text-xs text-azure-200">
               See detailed analysis for arrangement.
             </Text>
-
-            <View className="flex-row mt-3 gap-2">
-              <View className="rounded border border-navy-800/30 bg-navy-950 px-2 py-1">
-                <Text className="text-xs text-azure-200">
-                  Vol Eff: {carton.efficiency.volumeEfficiency}%
-                </Text>
-              </View>
-              <View className="rounded border border-navy-800/30 bg-navy-950 px-2 py-1">
-                <Text className="text-xs text-azure-200">
-                  Wt Util: {carton.efficiency.weightUtilization}%
-                </Text>
-              </View>
-            </View>
           </View>
         ))}
 

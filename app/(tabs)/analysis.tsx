@@ -1,10 +1,12 @@
 import PackingAnalysisResult from "@/components/analysis/PackingAnalysisResult";
 import SkeletonCard from "@/components/ui/SkeletonCard";
+import { useBoxes } from "@/contexts/BoxContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { useOptimal } from "@/contexts/OptimalContext";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -21,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Analysis() {
   const { items, isLoading: isLoadingItems } = useInventory();
+  const { fetchBoxes } = useBoxes();
   const { loading, error, result, fetchOptimalPacking, clearResult } =
     useOptimal();
 
@@ -30,6 +33,12 @@ export default function Analysis() {
   const [quantity, setQuantity] = useState<string>("1");
   const [quantityModalVisible, setQuantityModalVisible] = useState(false);
   const tabBarHeight = useBottomTabBarHeight();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBoxes(true);
+    }, [fetchBoxes]),
+  );
 
   // Tab 1: Select Item
   const renderSelectItem = () => (
@@ -183,10 +192,18 @@ export default function Analysis() {
                   }
                   setQuantityModalVisible(false);
                   setTab(2);
-                  await fetchOptimalPacking({
-                    productId: selectedItem._id,
-                    quantity: num,
-                  });
+                  try {
+                    await fetchOptimalPacking({
+                      productId: selectedItem._id,
+                      quantity: num,
+                    });
+                  } catch (syncError: any) {
+                    Alert.alert(
+                      "Sync Error",
+                      syncError?.message || "Error: Could not sync Items before analysis.",
+                    );
+                    setTab(1);
+                  }
                 }}
                 disabled={loading}
               >

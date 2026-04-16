@@ -2,7 +2,6 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system/legacy";
 import { Asset } from "expo-asset";
-import { formatCurrencyInr } from "./currency";
 
 type CartonLike = {
   cartonDetails?: {
@@ -10,7 +9,13 @@ type CartonLike = {
     name?: string;
     cost?: number;
     volume?: number;
+    length?: number;
+    breadth?: number;
+    height?: number;
   };
+  length?: number;
+  breadth?: number;
+  height?: number;
   cartonId?: string;
   cartonName?: string;
   itemsPacked?: number;
@@ -24,6 +29,15 @@ type CartonLike = {
   };
   packingMetrics?: {
     wasteSpace?: number;
+  };
+  layout?: {
+    packedItems?: {
+      dimensions?: {
+        length?: number;
+        breadth?: number;
+        height?: number;
+      };
+    }[];
   };
   cost?: {
     total?: number;
@@ -45,6 +59,12 @@ type PackingSlipInput = {
   logoDataUri?: string;
 };
 
+type PackingSlipSaveResult = {
+  uri: string;
+  fileName: string;
+  sharedWithSystemDialog: boolean;
+};
+
 let cachedLogoDataUri: string | null = null;
 
 async function getShipWiseLogoDataUri() {
@@ -64,14 +84,126 @@ async function getShipWiseLogoDataUri() {
   return cachedLogoDataUri;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
 function toFixed2(value: number) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return "0.00";
   return numeric.toFixed(2);
+}
+
+function toPositiveNumber(value: any) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function getCartonDimensions(carton: CartonLike) {
+  const source = carton.cartonDetails || carton;
+  const length =
+    toPositiveNumber((carton as any)?.boxLength) ||
+    toPositiveNumber(source?.length) ||
+    toPositiveNumber((source as any)?.boxLength) ||
+    toPositiveNumber((carton as any)?.length);
+  const breadth =
+    toPositiveNumber((carton as any)?.boxWidth) ||
+    toPositiveNumber((source as any)?.width) ||
+    toPositiveNumber((source as any)?.breadth) ||
+    toPositiveNumber((carton as any)?.width) ||
+    toPositiveNumber((carton as any)?.breadth);
+  const height =
+    toPositiveNumber((carton as any)?.boxHeight) ||
+    toPositiveNumber(source?.height) ||
+    toPositiveNumber((carton as any)?.height);
+  return { length, breadth, height };
+}
+
+function resolveOrientationDimensions(orientation: any) {
+  if (Array.isArray(orientation?.dims) && orientation.dims.length >= 3) {
+    return {
+      length: toPositiveNumber(orientation.dims[0]),
+      breadth: toPositiveNumber(orientation.dims[1]),
+      height: toPositiveNumber(orientation.dims[2]),
+    };
+  }
+
+  return { length: 0, breadth: 0, height: 0 };
+}
+
+function getUsedDimensions(carton: CartonLike) {
+  const fromOrientation = carton.orientationDetails?.dimensionsUsed;
+  if (fromOrientation) {
+    return {
+      length: Number(fromOrientation.length || 0),
+      breadth: Number(fromOrientation.breadth || 0),
+      height: Number(fromOrientation.height || 0),
+    };
+  }
+
+  const packedItems = Array.isArray(carton.layout?.packedItems)
+    ? carton.layout.packedItems
+    : [];
+  if (packedItems.length > 0) {
+    let maxLength = 0;
+    let maxBreadth = 0;
+    let maxHeight = 0;
+
+    for (const packed of packedItems) {
+      const position: any = (packed as any)?.position || {};
+      const dimensions: any = (packed as any)?.dimensions || {};
+      maxLength = Math.max(maxLength, Number(position.x || 0) + Number(dimensions.length || 0));
+      maxBreadth = Math.max(
+        maxBreadth,
+        Number(position.y || 0) + Number(dimensions.width ?? dimensions.breadth ?? 0),
+      );
+      maxHeight = Math.max(maxHeight, Number(position.z || 0) + Number(dimensions.height || 0));
+    }
+
+    if (maxLength > 0 && maxBreadth > 0 && maxHeight > 0) {
+      return {
+        length: maxLength,
+        breadth: maxBreadth,
+        height: maxHeight,
+      };
+    }
+  }
+
+  const arrangement: any = (carton.layout as any)?.arrangement;
+  const orientationDimensions = resolveOrientationDimensions((carton as any)?.orientation);
+  if (arrangement && orientationDimensions.length > 0) {
+    const arrangedLength = toPositiveNumber(arrangement.lengthwise) * orientationDimensions.length;
+    const arrangedBreadth = toPositiveNumber(arrangement.breadthwise) * orientationDimensions.breadth;
+    const arrangedHeight = toPositiveNumber(arrangement.layers) * orientationDimensions.height;
+
+    if (arrangedLength > 0 && arrangedBreadth > 0 && arrangedHeight > 0) {
+      return {
+        length: arrangedLength,
+        breadth: arrangedBreadth,
+        height: arrangedHeight,
+      };
+    }
+  }
+
+  const fullDimensions = getCartonDimensions(carton);
+  if (fullDimensions.length > 0 && fullDimensions.breadth > 0 && fullDimensions.height > 0) {
+    return {
+      length: fullDimensions.length,
+      breadth: fullDimensions.breadth,
+      height: fullDimensions.height,
+    };
+  }
+
+  console.warn("[PackingSlip] Missing dimensionsUsed for carton", {
+    cartonId: (carton as any)?.cartonId,
+    cartonName: (carton as any)?.cartonName,
+  });
+  return {
+    length: 0,
+    breadth: 0,
+    height: 0,
+  };
+}
+
+function buildInvoiceFileName(generatedAt: Date) {
+  const timestamp = generatedAt.getTime();
+  return `ShipWise_${timestamp}.pdf`;
 }
 
 function escapeHtml(value: string) {
@@ -101,18 +233,6 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
   const cartonsUsed = cartons.length;
 
   const totalWeightKg = (packedQty * Number(input.productWeightGrams || 0)) / 1000;
-  const cartonBaseCost = Number(
-    input.cartonBaseCost ??
-      cartons.reduce((sum, carton) => sum + Number(carton.cartonDetails?.cost || 0), 0),
-  );
-  const shippingRatePerKg = Number(input.shippingRatePerKg ?? 18);
-  const shippingCostByWeight = totalWeightKg * shippingRatePerKg;
-  const fragileHandlingFee = Number(input.fragileHandlingFee ?? (input.isFragile ? 35 : 0));
-  const estimatedCost = clamp(
-    cartonBaseCost + shippingCostByWeight + fragileHandlingFee,
-    0,
-    Number.MAX_SAFE_INTEGER,
-  );
   const logoDataUri = input.logoDataUri || "";
 
   type GroupedInstruction = {
@@ -126,20 +246,24 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
   const groupedInstructions: GroupedInstruction[] = Array.from(
     cartons
       .reduce((groups: Map<string, GroupedInstruction>, carton) => {
-        const boxType = carton.cartonDetails?.name || carton.cartonName || "Carton";
+        const boxType =
+          (carton as any)?.boxName ||
+          (carton as any)?.cartonDetails?.name ||
+          carton.cartonName ||
+          "Box";
         const orientationLabel = getOrientationLabel(carton.orientation);
         const itemsPerBox = Number(carton.itemsPacked || 0);
-        const dimensions = carton.orientationDetails?.dimensionsUsed
-          ? `${carton.orientationDetails.dimensionsUsed.length} x ${carton.orientationDetails.dimensionsUsed.breadth} x ${carton.orientationDetails.dimensionsUsed.height}`
-          : "N/A";
+        const usedDimensions = getUsedDimensions(carton);
+        const fullDimensions = getCartonDimensions(carton);
+        const usedLabel = `${toFixed2(usedDimensions.length)}x${toFixed2(usedDimensions.breadth)}x${toFixed2(usedDimensions.height)}`;
 
-        const key = `${boxType}__${dimensions}__${orientationLabel}__${itemsPerBox}`;
+        const key = `${boxType}__${usedLabel}__${orientationLabel}__${itemsPerBox}`;
         const previous = groups.get(key) || {
           boxType,
           quantityOfBoxes: 0,
           itemsPerBox,
           orientationLabel,
-          dimensions,
+          dimensions: usedLabel,
         };
 
         groups.set(key, {
@@ -328,7 +452,7 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
           }
 
           .page-footer .pages::after {
-            content: counter(page) ' of ' counter(pages);
+            content: counter(page) + 1 ' of ' counter(pages) + 1;
           }
         </style>
       </head>
@@ -360,7 +484,6 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
               <div><strong>Total Items:</strong> ${packedQty}</div>
               <div><strong>Total Cartons:</strong> ${cartonsUsed}</div>
               <div><strong>Total Weight:</strong> ${toFixed2(totalWeightKg)} kg</div>
-              <div><strong>Estimated Cost:</strong> ${formatCurrencyInr(estimatedCost)}</div>
             </div>
           </div>
 
@@ -413,20 +536,41 @@ export function buildPackingSlipHtml(input: PackingSlipInput) {
 
 export async function generateAndSharePackingSlip(input: PackingSlipInput) {
   const logoDataUri = input.logoDataUri || (await getShipWiseLogoDataUri());
+  const generatedAt = input.generatedAt || new Date();
+  const fileName = buildInvoiceFileName(generatedAt);
   const html = buildPackingSlipHtml({
     ...input,
+    generatedAt,
     logoDataUri,
   });
-  const file = await Print.printToFileAsync({ html });
+  const printedFile = await Print.printToFileAsync({ html });
+  const cacheDirectory = FileSystem.cacheDirectory || FileSystem.documentDirectory;
 
-  const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(file.uri, {
-      mimeType: "application/pdf",
-      dialogTitle: "Download PDF",
-      UTI: "com.adobe.pdf",
-    });
+  if (!cacheDirectory) {
+    throw new Error("Unable to access local storage for export.");
   }
 
-  return file.uri;
+  const namedFileUri = `${cacheDirectory}${fileName}`;
+
+  await FileSystem.copyAsync({
+    from: printedFile.uri,
+    to: namedFileUri,
+  });
+
+  const canShare = await Sharing.isAvailableAsync();
+  if (!canShare) {
+    throw new Error("Unable to open system save dialog on this device.");
+  }
+
+  await Sharing.shareAsync(namedFileUri, {
+    mimeType: "application/pdf",
+    dialogTitle: "Save Invoice",
+    UTI: "com.adobe.pdf",
+  });
+
+  return {
+    uri: namedFileUri,
+    fileName,
+    sharedWithSystemDialog: true,
+  } satisfies PackingSlipSaveResult;
 }

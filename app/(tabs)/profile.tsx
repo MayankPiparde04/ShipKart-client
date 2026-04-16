@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { apiService } from "@/services/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
@@ -21,9 +22,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const LIGHT_FOREGROUND = "#EAF4FF";
 
 export default function ProfileScreen() {
-  const { user, logout, updateUserContext, updateTokens } = useAuth();
+  const { user, isLoading, logout, updateUserContext, updateTokens } = useAuth();
   const { height } = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
+  const [hydratedUser, setHydratedUser] = useState<any>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,18 +49,51 @@ export default function ProfileScreen() {
     confirm: false,
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateUser = async () => {
+      if (user) {
+        setHydratedUser(user);
+        return;
+      }
+
+      try {
+        const storedUser = await AsyncStorage.getItem("user");
+        if (!isMounted) return;
+        if (storedUser) {
+          setHydratedUser(JSON.parse(storedUser));
+        }
+      } catch {
+        if (isMounted) {
+          setHydratedUser(null);
+        }
+      }
+    };
+
+    hydrateUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const profileUser = user || hydratedUser;
+  const resolvedFullName =
+    profileUser?.fullName?.trim() || profileUser?.name?.trim() || "";
+
   // Update editedUser when user data changes
   useEffect(() => {
-    if (user) {
+    if (profileUser) {
       setEditedUser({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        company: user.company || "",
-        address: user.address || "",
+        name: resolvedFullName,
+        email: profileUser.email || "",
+        phone: profileUser.phone || "",
+        company: profileUser.company || "",
+        address: profileUser.address || "",
       });
     }
-  }, [user]);
+  }, [profileUser, resolvedFullName]);
 
   const handleSave = async () => {
     try {
@@ -205,12 +240,21 @@ export default function ProfileScreen() {
           />
         ) : (
           <Text className="ml-5 text-azure-50">
-            {displayValue || `No ${label.toLowerCase()} provided`}
+            {displayValue || "Not provided"}
           </Text>
         )}
       </View>
     );
   };
+
+  if (isLoading || !profileUser) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-navy-950">
+        <ActivityIndicator size="large" color="#00F6FF" />
+        <Text className="mt-3 text-sm text-azure-200">Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-navy-950">
@@ -227,11 +271,11 @@ export default function ProfileScreen() {
           <View className="items-center">
             <View className="h-24 w-24 items-center justify-center rounded-full border border-navy-800/40 bg-navy-900">
               <Text className="text-3xl font-semibold text-azure-500">
-                {getInitials(user?.name)}
+                {getInitials(resolvedFullName)}
               </Text>
             </View>
             <Text className="mt-3 text-xl font-bold text-azure-50">
-              {user?.name || "User"}
+              {resolvedFullName}
             </Text>
 
             {!isEditing && (
@@ -292,19 +336,19 @@ export default function ProfileScreen() {
               )}
             </View>
 
-            {renderField("person-outline", "Full Name", user?.name, "name")}
-            {renderField("mail-outline", "Email", user?.email, "email")}
-            {renderField("call-outline", "Phone", user?.phone, "phone")}
+            {renderField("person-outline", "Full Name", resolvedFullName, "name")}
+            {renderField("mail-outline", "Email", profileUser?.email, "email")}
+            {renderField("call-outline", "Phone", profileUser?.phone, "phone")}
             {renderField(
               "business-outline",
               "Company",
-              user?.company,
+              profileUser?.company,
               "company",
             )}
             {renderField(
               "location-outline",
               "Address",
-              user?.address,
+              profileUser?.address,
               "address",
             )}
           </View>
@@ -351,7 +395,7 @@ export default function ProfileScreen() {
             </Text>
 
             <View className="mt-5 gap-3">
-              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+              <View className="relative rounded-card border border-navy-800/40 bg-navy-950">
                 <TextInput
                   className="h-12 px-4 pr-12 text-azure-50"
                   placeholder="Current Password"
@@ -376,7 +420,7 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+              <View className="relative rounded-card border border-navy-800/40 bg-navy-950">
                 <TextInput
                   className="h-12 px-4 pr-12 text-azure-50"
                   placeholder="New Password"
@@ -401,7 +445,7 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View className="rounded-card border border-navy-800/40 bg-navy-950">
+              <View className="relative rounded-card border border-navy-800/40 bg-navy-950">
                 <TextInput
                   className="h-12 px-4 pr-12 text-azure-50"
                   placeholder="Confirm New Password"

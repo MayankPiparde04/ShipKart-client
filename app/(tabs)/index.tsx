@@ -1,6 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useBoxes } from "@/contexts/BoxContext";
-import { useHistory } from "@/contexts/HistoryContext";
 import { useInventory } from "@/contexts/InventoryContext";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { router, useFocusEffect } from "expo-router";
@@ -31,7 +30,6 @@ export default function Home() {
   const isAuthenticated = Boolean(user);
   const { items, dailyData, dailySold, fetchItems } = useInventory();
   const { boxes, fetchBoxes } = useBoxes();
-  const { transactions, fetchTransactions } = useHistory();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const pulse = useRef(new Animated.Value(0.5)).current;
@@ -93,14 +91,6 @@ export default function Home() {
     setLoading(false);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!isAuthLoading && isAuthenticated) {
-        fetchTransactions(100);
-      }
-    }, [fetchTransactions, isAuthenticated, isAuthLoading]),
-  );
-
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
       // Keep loading state in sync after auth resolves.
@@ -112,7 +102,7 @@ export default function Home() {
     if (!isAuthenticated) return;
     setRefreshing(true);
     try {
-      await Promise.all([fetchItems(), fetchBoxes(), fetchTransactions(100)]);
+      await Promise.all([fetchItems(), fetchBoxes()]);
     } finally {
       setRefreshing(false);
     }
@@ -123,40 +113,13 @@ export default function Home() {
     [boxes],
   );
 
-  const hotItem = useMemo(() => {
-    if (!transactions.length) return null;
-
-    const frequency = new Map<string, number>();
-    transactions.forEach((transaction) => {
-      const name = transaction.productName?.trim();
-      if (!name) return;
-      frequency.set(name, (frequency.get(name) || 0) + Number(transaction.packedQty || 1));
-    });
-
-    let bestName: string | null = null;
-    let bestCount = 0;
-    frequency.forEach((count, name) => {
-      if (count > bestCount) {
-        bestName = name;
-        bestCount = count;
-      }
-    });
-
-    if (!bestName) return null;
-    return { name: bestName, packedCount: bestCount };
-  }, [transactions]);
-
   const insightMessage = useMemo(() => {
     if (lowStockBox) {
       return `Critical: Order more ${lowStockBox.box_name} soon!`;
     }
 
-    if (hotItem) {
-      return `Hot Item: ${hotItem.name} is being packed frequently.`;
-    }
-
     return "Inventory is stable. Keep scanning to unlock deeper movement insights.";
-  }, [lowStockBox, hotItem]);
+  }, [lowStockBox]);
 
   const totalQuantity = useMemo(
     () =>

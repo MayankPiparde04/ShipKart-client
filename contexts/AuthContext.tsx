@@ -11,6 +11,7 @@ import {
 
 interface User {
   _id: string;
+  fullName?: string;
   name: string;
   email: string;
   role: string;
